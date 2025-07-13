@@ -10,10 +10,20 @@
 <body>
     <div class="container">
         <div id="auth-container" class="auth-form">
-            <h1>Web Terminal</h1>
-            <input type="password" id="password" placeholder="Enter password" />
-            <button id="connect-btn">Connect</button>
+            <h1>🖥️ Web Terminal</h1>
+            <div id="code-request-form">
+                <p>Для доступа к терминалу нажмите кнопку ниже.<br>Код доступа будет отправлен на ваш email.</p>
+                <button id="request-code-btn" class="primary-btn">📧 Запросить код доступа</button>
+                <div id="email-info" class="email-info" style="display: none;"></div>
+            </div>
+            <div id="code-input-form" style="display: none;">
+                <p>Введите 6-значный код из email:</p>
+                <input type="text" id="access-code" placeholder="000000" maxlength="6" pattern="[0-9]{6}" />
+                <button id="verify-code-btn" class="primary-btn">🔐 Войти</button>
+                <button id="request-new-code-btn" class="secondary-btn">📧 Запросить новый код</button>
+            </div>
             <div id="error-msg" class="error"></div>
+            <div id="success-msg" class="success"></div>
         </div>
         <div id="terminal-container" style="display: none;">
             <div id="mobile-controls" class="mobile-controls">
@@ -60,6 +70,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

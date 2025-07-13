@@ -2,27 +2,94 @@ let socket = null;
 let term = null;
 let fitAddon = null;
 
-const authContainer = document.getElementById('auth-container');
-const terminalContainer = document.getElementById('terminal-container');
-const passwordInput = document.getElementById('password');
-const connectBtn = document.getElementById('connect-btn');
-const errorMsg = document.getElementById('error-msg');
+// DOM elements
+let authContainer, terminalContainer, errorMsg, successMsg;
+let codeRequestForm, requestCodeBtn, emailInfo;
+let codeInputForm, accessCodeInput, verifyCodeBtn, requestNewCodeBtn;
 
-connectBtn.addEventListener('click', authenticate);
-passwordInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') authenticate();
+// Initialize DOM elements when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    // DOM elements
+    authContainer = document.getElementById('auth-container');
+    terminalContainer = document.getElementById('terminal-container');
+    errorMsg = document.getElementById('error-msg');
+    successMsg = document.getElementById('success-msg');
+
+    // Code request form elements
+    codeRequestForm = document.getElementById('code-request-form');
+    requestCodeBtn = document.getElementById('request-code-btn');
+    emailInfo = document.getElementById('email-info');
+
+    // Code input form elements
+    codeInputForm = document.getElementById('code-input-form');
+    accessCodeInput = document.getElementById('access-code');
+    verifyCodeBtn = document.getElementById('verify-code-btn');
+    requestNewCodeBtn = document.getElementById('request-new-code-btn');
+
+    // Event listeners
+    if (requestCodeBtn) requestCodeBtn.addEventListener('click', requestAccessCode);
+    if (verifyCodeBtn) verifyCodeBtn.addEventListener('click', verifyAccessCode);
+    if (requestNewCodeBtn) requestNewCodeBtn.addEventListener('click', requestNewAccessCode);
+
+    if (accessCodeInput) {
+        accessCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verifyAccessCode();
+        });
+
+        accessCodeInput.addEventListener('input', (e) => {
+            // Only allow numbers
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+        });
+    }
 });
 
-async function authenticate() {
-    const password = passwordInput.value;
-    if (!password) {
-        showError('Please enter a password');
+async function requestAccessCode() {
+    requestCodeBtn.disabled = true;
+    requestCodeBtn.textContent = 'Отправляем...';
+    clearMessages();
+
+    try {
+        const response = await fetch('/auth/request-code', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Не удалось запросить код');
+        }
+
+        showSuccess('Код отправлен на ваш email!');
+        emailInfo.innerHTML = '<strong>📧 Код отправлен на:</strong> ' + data.email;
+        emailInfo.style.display = 'block';
+        
+        // Переключаемся на форму ввода кода
+        codeRequestForm.style.display = 'none';
+        codeInputForm.style.display = 'block';
+        accessCodeInput.focus();
+
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        requestCodeBtn.disabled = false;
+        requestCodeBtn.textContent = '📧 Запросить код доступа';
+    }
+}
+
+async function verifyAccessCode() {
+    const accessCode = accessCodeInput.value.trim();
+    
+    if (!accessCode || accessCode.length !== 6) {
+        showError('Введите 6-значный код из email');
         return;
     }
 
-    connectBtn.disabled = true;
-    connectBtn.textContent = 'Connecting...';
-    errorMsg.textContent = '';
+    verifyCodeBtn.disabled = true;
+    verifyCodeBtn.textContent = 'Проверяем...';
+    clearMessages();
 
     try {
         const response = await fetch('/auth/token', {
@@ -30,29 +97,55 @@ async function authenticate() {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({ accessCode }),
         });
 
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || 'Authentication failed');
+            throw new Error(data.error || 'Неверный код доступа');
         }
 
         localStorage.setItem('token', data.token);
-        connectToTerminal(data.token);
+        showSuccess('Код принят! Подключаемся к терминалу...');
+        
+        setTimeout(() => {
+            connectToTerminal(data.token);
+        }, 1000);
+
     } catch (error) {
         showError(error.message);
-        connectBtn.disabled = false;
-        connectBtn.textContent = 'Connect';
+        verifyCodeBtn.disabled = false;
+        verifyCodeBtn.textContent = '🔐 Войти';
     }
+}
+
+async function requestNewAccessCode() {
+    // Возвращаемся к первой форме
+    codeInputForm.style.display = 'none';
+    codeRequestForm.style.display = 'block';
+    emailInfo.style.display = 'none';
+    accessCodeInput.value = '';
+    clearMessages();
 }
 
 function showError(message) {
     errorMsg.textContent = message;
-    setTimeout(() => {
-        errorMsg.textContent = '';
-    }, 5000);
+    errorMsg.style.display = 'block';
+    successMsg.style.display = 'none';
+}
+
+function showSuccess(message) {
+    successMsg.textContent = message;
+    successMsg.style.display = 'block';
+    errorMsg.style.display = 'none';
+}
+
+function clearMessages() {
+    errorMsg.textContent = '';
+    successMsg.textContent = '';
+    errorMsg.style.display = 'none';
+    successMsg.style.display = 'none';
 }
 
 function connectToTerminal(token) {

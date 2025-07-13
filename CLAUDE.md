@@ -4,100 +4,176 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Terminal-to-Web is a web-based terminal emulator that enables remote control of a macOS terminal from any device through a web browser. The application provides secure terminal access with mobile-optimized interface and real-time communication.
+Terminal-to-Web is a web-based terminal emulator that enables remote control of a macOS terminal from any device through a web browser. The application uses email-based two-factor authentication with one-time access codes for security.
 
 ## Architecture
 
-The application follows a client-server architecture with WebSocket communication:
-
 ### Backend Architecture (Node.js + TypeScript)
-- **Server Entry Point**: `src/server.ts` - Express server with Socket.IO integration
-- **Terminal Management**: `src/terminalHandler.ts` - Manages PTY processes using node-pty
-- **Authentication**: `src/middleware/auth.ts` - JWT-based WebSocket authentication
-- **Security**: `src/utils/security.ts` - Rate limiting and IP-based attack prevention
-- **Static Files**: Serves frontend from `public/` directory
+- **Server Entry Point**: `src/server.ts` - Express server with Socket.IO integration and email authentication endpoints
+- **Configuration**: `src/config.ts` - Centralized configuration with environment variable validation
+- **Service Layer**: 
+  - `src/services/TerminalManager.ts` - PTY process management with node-pty
+  - `src/services/AccessCodeService.ts` - Generates/validates 6-digit access codes
+  - `src/services/ResendEmailService.ts` - Email service using Resend API (primary)
+  - `src/services/EmailService.ts` - Gmail SMTP fallback service
+- **Security Layer**:
+  - `src/middleware/auth.ts` - JWT-based WebSocket authentication
+  - `src/utils/security.ts` - Rate limiting with IP tracking and progressive lockout
+  - `src/utils/validation.ts` - Input validation and XSS protection
 
-### Frontend Architecture (Vanilla JS)
-- **Terminal Emulation**: Uses xterm.js for browser-based terminal rendering
-- **Communication**: Socket.IO client for real-time terminal I/O
-- **Mobile Support**: Responsive design with virtual keyboard and touch controls
-- **Quick Commands**: Local storage-based command shortcuts system
+### Frontend Architecture (Vanilla JS + ES5 Compatibility)
+- **Terminal Emulation**: xterm.js with fit addon for browser-based terminal
+- **Communication**: Socket.IO client for real-time bidirectional terminal I/O
+- **Authentication UI**: Email code request and validation forms
+- **Mobile Controls**: Comprehensive touch-friendly virtual controls panel
 
-### Key Data Flow
-1. Client authenticates with password → JWT token issued
-2. WebSocket connection established with JWT validation
-3. PTY process spawned for authenticated client
-4. Bidirectional terminal data flows through Socket.IO events
-5. Terminal resize/input events synchronized between client and PTY
+### Email Authentication Flow
+1. User requests access code via `/auth/request-code` endpoint
+2. 6-digit code generated (10-minute expiry) and sent via email
+3. User enters code via `/auth/token` endpoint  
+4. JWT token issued upon successful validation
+5. WebSocket authentication uses JWT for terminal access
+6. All terminal operations require valid JWT token
 
 ## Development Commands
 
 ### Local Development
 ```bash
-npm run dev          # Start development server with hot reload
-npm run build        # Compile TypeScript to dist/
-npm start           # Run production build
+npm run dev              # Start with nodemon hot reload
+npm run start:dev        # Start server + Cloudflare tunnel concurrently
+npm run build            # Compile TypeScript to dist/
+npm start               # Run production build
+npm run start:all       # Build + start server + tunnel concurrently
 ```
 
-### Remote Access Setup
+### Code Quality
 ```bash
-./setup-cloudflare.sh                    # Configure Cloudflare Tunnel
-cloudflared tunnel --url http://localhost:3000  # Quick tunnel
+npm run lint            # ESLint check
+npm run lint:fix        # Auto-fix linting issues
+npm run format          # Prettier formatting
+npm run typecheck       # TypeScript type checking without emit
 ```
 
-## Configuration
+### Production Deployment
+```bash
+# Run type checks before building
+npm run typecheck && npm run build && npm start
+```
 
-### Required Environment Variables (.env)
-- `PORT` - Server port (default: 3000)
-- `JWT_SECRET` - Secret for JWT token signing (CHANGE IN PRODUCTION)
-- `ACCESS_PASSWORD` - Authentication password (CHANGE IN PRODUCTION)
-- `NODE_ENV` - Environment (development/production)
+## Environment Configuration (.env)
 
-### Security Considerations
-- Default credentials in `.env` must be changed for production use
-- Rate limiting: 5 authentication attempts per 15 minutes per IP
-- JWT tokens expire after 24 hours
-- WebSocket authentication required for all terminal operations
+### Required Variables
+```bash
+# Security (MUST CHANGE FOR PRODUCTION)
+JWT_SECRET=at-least-32-character-secret-key
+ACCESS_PASSWORD=change-this-secure-password  # Legacy, kept for compatibility
 
-## Mobile-Specific Features
+# Email Service (Resend - 3000 emails/month free)
+RESEND_API_KEY=re_xxxxxxxxxx
+NOTIFICATION_EMAIL=your-email@domain.com
 
-The frontend includes extensive mobile optimization:
+# Gmail Fallback (if Resend not configured)
+EMAIL_USER=your-gmail@gmail.com
+EMAIL_PASSWORD=gmail-app-password
+```
 
-### Mobile Controls (`public/app.js` - QuickCommands class)
-- Virtual control panel with Ctrl/Alt/Tab/Esc buttons
-- Arrow key navigation panel
-- Quick command shortcuts stored in localStorage
-- Responsive font sizing based on device orientation
+### Optional Variables
+```bash
+PORT=3000
+NODE_ENV=development
+MAX_LOGIN_ATTEMPTS=5
+LOCKOUT_TIME_MINUTES=15
+JWT_EXPIRES_IN=24h
+ACCESS_CODE_EXPIRY_MINUTES=10
+```
+
+## Security Architecture
+
+### Rate Limiting
+- 5 authentication attempts per IP per 15 minutes
+- Automatic cleanup of expired attempts
+- Progressive lockout with exponential backoff
+- IP-based tracking in memory (no external dependencies)
+
+### Access Code System
+- 6-digit numeric codes with 10-minute expiry
+- One active code per email at a time  
+- IP validation (optional strict mode)
+- Automatic cleanup of expired codes
+
+### JWT Implementation
+- 24-hour token expiry (configurable)
+- Secure signing with minimum 32-character secret
+- WebSocket authentication middleware validates all connections
+- Graceful token refresh handling
+
+## Mobile Optimization
+
+### Virtual Controls (`public/app.js`)
+- **Control Panel**: Ctrl/Alt/Tab/Esc virtual buttons
+- **Arrow Keys**: Dedicated navigation panel  
+- **Quick Commands**: Persistent localStorage-based command shortcuts
+- **Responsive Design**: Font sizing adapts to device orientation
+- **Touch Support**: Virtual keyboard integration for mobile browsers
 
 ### Browser Compatibility
 - ES5-compatible JavaScript for older mobile browsers
-- Fallback CSS with vendor prefixes
-- Text-based button labels instead of emoji for universal support
+- Vendor-prefixed CSS for maximum compatibility
+- Graceful degradation for unsupported features
+- Touch event handling with fallbacks
 
-## Key Components
+## Service Layer Architecture
 
-### Terminal Session Management (`src/terminalHandler.ts`)
-- One PTY process per WebSocket connection
-- Automatic cleanup on client disconnect
-- Dynamic terminal resizing support
-- Cross-platform shell detection (bash/powershell)
+### TerminalManager (`src/services/TerminalManager.ts`)
+- Singleton pattern for shared terminal management
+- PTY process lifecycle management
+- Environment variable filtering for security
+- Cross-platform shell detection
 
-### Authentication Flow (`src/middleware/auth.ts`)
-- Password-based initial authentication via REST endpoint
-- JWT token stored in client localStorage
-- WebSocket connections validated with JWT in handshake
-- Per-user session tracking
+### Email Services
+- **Primary**: ResendEmailService with HTML email templates
+- **Fallback**: EmailService using Gmail SMTP with App Passwords
+- Development mode shows codes in console when email not configured
+- Automatic service selection based on environment variables
 
-### Security Implementation (`src/utils/security.ts`)
-- In-memory rate limiting (no external dependencies)
-- IP-based attempt tracking with automatic cleanup
-- Failed attempt logging and progressive lockout
+### Access Code Service
+- In-memory code storage with automatic expiry
+- Thread-safe code generation and validation
+- IP-based security checks
+- Comprehensive logging and monitoring
 
-## Remote Access Options
+## Remote Access Setup
 
-The application supports multiple remote access methods documented in `REMOTE_ACCESS.md`:
-1. Cloudflare Tunnel (recommended) - Zero-config public access
-2. Ngrok - Simple development tunneling
-3. VPS + Nginx - Production deployment with custom domain
+### Cloudflare Tunnel (Recommended)
+```bash
+# Named tunnel (production)
+npm run start:all        # Uses configured tunnel from ~/.cloudflared/config.yml
 
-Each method requires the server to be running locally and provides HTTPS access from anywhere.
+# Quick tunnel (development)
+cloudflared tunnel --url localhost:3000
+```
+
+### Email Service Setup
+1. **Resend** (recommended): Register at resend.com, get API key
+2. **Gmail**: Enable 2FA, create App Password for SMTP access
+3. Development mode works without email configuration (codes in console)
+
+## Key Implementation Details
+
+### Error Handling
+- Centralized error middleware in `src/middleware/errorHandler.ts`
+- Structured logging with request context
+- Graceful degradation for email service failures
+- Client-side error boundaries for WebSocket failures
+
+### TypeScript Configuration
+- Strict mode enabled with comprehensive type checking
+- ES2020 target for modern Node.js features  
+- Absolute imports from src/ directory
+- Development build uses ts-node for hot reload
+
+### Frontend State Management
+- JWT tokens stored in localStorage with automatic cleanup
+- Terminal state synchronized via Socket.IO events
+- Mobile controls use event delegation for performance
+- Quick commands persist across browser sessions

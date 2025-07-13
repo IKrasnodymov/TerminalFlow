@@ -41,7 +41,16 @@ export const config = {
   // CORS configuration
   corsOrigin: process.env.NODE_ENV === 'production' 
     ? (process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : false)
-    : '*'
+    : '*',
+  
+  // Email configuration
+  emailUser: getRequiredEnv('EMAIL_USER'),
+  emailPassword: getRequiredEnv('EMAIL_PASSWORD'),
+  notificationEmail: getRequiredEnv('NOTIFICATION_EMAIL'),
+  
+  // Access code configuration
+  accessCodeExpiryMinutes: parseInt(getOptionalEnv('ACCESS_CODE_EXPIRY_MINUTES', '10'), 10),
+  strictIpValidation: getOptionalEnv('STRICT_IP_VALIDATION', 'false') === 'true'
 };
 
 // Validate configuration
