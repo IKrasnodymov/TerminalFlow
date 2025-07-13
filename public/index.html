@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Web Terminal</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <div class="container">
+        <div id="auth-container" class="auth-form">
+            <h1>Web Terminal</h1>
+            <input type="password" id="password" placeholder="Enter password" />
+            <button id="connect-btn">Connect</button>
+            <div id="error-msg" class="error"></div>
+        </div>
+        <div id="terminal-container" style="display: none;">
+            <div id="mobile-controls" class="mobile-controls">
+                <button id="ctrl-btn" class="control-btn">Ctrl</button>
+                <button id="alt-btn" class="control-btn">Alt</button>
+                <button id="tab-btn" class="control-btn">Tab</button>
+                <button id="esc-btn" class="control-btn">Esc</button>
+                <button id="arrows-btn" class="control-btn">↑↓←→</button>
+                <button id="commands-btn" class="control-btn">CMD</button>
+                <button id="fullscreen-btn" class="control-btn">[ ]</button>
+            </div>
+            <div id="terminal"></div>
+            <div id="arrow-keys" class="arrow-keys" style="display: none;">
+                <div class="arrow-row">
+                    <button class="arrow-btn" data-key="ArrowUp">↑</button>
+                </div>
+                <div class="arrow-row">
+                    <button class="arrow-btn" data-key="ArrowLeft">←</button>
+                    <button class="arrow-btn" data-key="ArrowDown">↓</button>
+                    <button class="arrow-btn" data-key="ArrowRight">→</button>
+                </div>
+            </div>
+            
+            <div id="quick-commands" class="quick-commands" style="display: none;">
+                <div class="commands-header">
+                    <span>Быстрые команды</span>
+                    <button id="add-command-btn" class="add-command-btn">+</button>
+                </div>
+                <div id="commands-list" class="commands-list">
+                    <!-- Commands will be populated here -->
+                </div>
+                <div id="add-command-form" class="add-command-form" style="display: none;">
+                    <input type="text" id="command-input" placeholder="Введите команду..." maxlength="100">
+                    <input type="text" id="command-name" placeholder="Название (опционально)" maxlength="20">
+                    <div class="form-buttons">
+                        <button id="save-command-btn">Сохранить</button>
+                        <button id="cancel-command-btn">Отмена</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
