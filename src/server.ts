@@ -15,6 +15,7 @@ import { validatePassword } from './utils/validation';
 import { AuthRequest, AuthResponse, HealthResponse, JWTPayload } from './types';
 import { ResendEmailService } from './services/ResendEmailService';
 import { AccessCodeService } from './services/AccessCodeService';
+import { commandService } from './services/CommandService';
 
 const app = express();
 const httpServer = createServer(app);
@@ -208,6 +209,101 @@ app.get('/admin/stats', asyncHandler(async (req, res) => {
   
   const stats = rateLimiter.getStats();
   res.json(stats);
+}));
+
+// Command management endpoints
+app.get('/api/commands', asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+    const userId = decoded.userId || 'default';
+    
+    const commands = await commandService.getCommands(userId);
+    res.json({ commands });
+  } catch (error) {
+    logger.error('Failed to get commands', { error });
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}));
+
+app.post('/api/commands', asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+    const userId = decoded.userId || 'default';
+    
+    const { cmd, desc } = req.body;
+    if (!cmd || !desc) {
+      return res.status(400).json({ error: 'Command and description are required' });
+    }
+    
+    const command = await commandService.addCommand(userId, cmd, desc);
+    res.json({ command });
+  } catch (error) {
+    logger.error('Failed to add command', { error });
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}));
+
+app.put('/api/commands/:id', asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+    const userId = decoded.userId || 'default';
+    
+    const { cmd, desc } = req.body;
+    if (!cmd || !desc) {
+      return res.status(400).json({ error: 'Command and description are required' });
+    }
+    
+    const command = await commandService.updateCommand(userId, req.params.id, cmd, desc);
+    if (!command) {
+      return res.status(404).json({ error: 'Command not found' });
+    }
+    
+    res.json({ command });
+  } catch (error) {
+    logger.error('Failed to update command', { error });
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}));
+
+app.delete('/api/commands/:id', asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+    const userId = decoded.userId || 'default';
+    
+    const deleted = await commandService.deleteCommand(userId, req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Command not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Failed to delete command', { error });
+    res.status(401).json({ error: 'Invalid token' });
+  }
 }));
 
 

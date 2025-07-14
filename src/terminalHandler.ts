@@ -30,40 +30,57 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
     // Handle terminal creation
     socket.on('terminal:create', async (options: TerminalCreateEvent = {}) => {
       try {
-        const session = await terminalManager.createTerminal(
+        // Check if options includes a sessionId for reconnection
+        const sessionId = (options as any).sessionId;
+        
+        const result = await terminalManager.createOrReuseTerminal(
           socket.id,
           userId,
+          sessionId,
           {
             cols: options.cols,
             rows: options.rows
           }
         );
 
-        // Set up data handler
-        session.pty.onData((data: string) => {
-          // Send data as-is without filtering
-          socket.emit('terminal:data', data);
-        });
-
-        // Set up exit handler
-        session.pty.onExit((e) => {
-          logger.info('Terminal process exited', {
-            socketId: socket.id,
-            userId,
-            exitCode: e.exitCode,
-            signal: e.signal
+        // Set up data handler (only for new sessions, existing ones already have it)
+        if (result.isNew) {
+          result.session.pty.onData((data: string) => {
+            // Send data as-is without filtering
+            socket.emit('terminal:data', data);
           });
-          
-          socket.emit('terminal:exit');
-          terminalManager.destroyTerminal(socket.id);
-        });
 
-        socket.emit('terminal:ready');
+          // Set up exit handler
+          result.session.pty.onExit((e) => {
+            logger.info('Terminal process exited', {
+              socketId: socket.id,
+              userId,
+              exitCode: e.exitCode,
+              signal: e.signal
+            });
+            
+            socket.emit('terminal:exit');
+            terminalManager.destroyTerminal(socket.id, true); // Force destroy on exit
+          });
+        } else {
+          // For reconnected sessions, we need to re-attach the data handler
+          result.session.pty.onData((data: string) => {
+            socket.emit('terminal:data', data);
+          });
+        }
+
+        // Send session info to client (cast to any since we're extending the API)
+        (socket as any).emit('terminal:ready', {
+          sessionId: result.sessionId,
+          isNew: result.isNew
+        });
         
-        logger.info('Terminal session established', {
+        logger.info(result.isNew ? 'Terminal session established' : 'Terminal session reconnected', {
           socketId: socket.id,
+          sessionId: result.sessionId,
           userId,
-          pid: session.pty.pid
+          pid: result.session.pty.pid,
+          isNew: result.isNew
         });
 
       } catch (error) {
@@ -196,7 +213,8 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
       });
 
       try {
-        await terminalManager.destroyTerminal(socket.id);
+        // Use disconnectTerminal instead of destroyTerminal to keep session alive
+        await terminalManager.disconnectTerminal(socket.id);
       } catch (error) {
         logger.error('Failed to cleanup terminal on disconnect', {
           socketId: socket.id,

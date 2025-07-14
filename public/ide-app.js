@@ -6,6 +6,7 @@ class SimpleIDE {
         this.socket = null;
         this.fileTree = {};
         this.currentPath = '/';
+        this.sessionId = null;
         
         this.init();
     }
@@ -21,7 +22,6 @@ class SimpleIDE {
         this.setupTerminal();
         this.setupSocket(token);
         this.setupEventListeners();
-        this.loadTheme();
         this.loadFileTree();
     }
     
@@ -57,18 +57,37 @@ class SimpleIDE {
     
     setupSocket(token) {
         this.socket = io('/', {
-            auth: { token }
+            auth: { token },
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5
         });
         
         this.socket.on('connect', () => {
             this.updateStatus('Connected', true);
+            
+            // Check for existing session ID
+            const storedSessionId = localStorage.getItem('terminal-session-id');
+            
             this.socket.emit('terminal:create', {
                 cols: this.term.cols,
-                rows: this.term.rows
+                rows: this.term.rows,
+                sessionId: storedSessionId || undefined
             });
         });
         
-        this.socket.on('terminal:ready', () => {
+        this.socket.on('terminal:ready', (data) => {
+            // Handle both old format (no data) and new format (with session info)
+            if (data && data.sessionId) {
+                this.sessionId = data.sessionId;
+                localStorage.setItem('terminal-session-id', data.sessionId);
+                
+                if (!data.isNew) {
+                    // Session was reconnected, show a message
+                    this.term.writeln('\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n');
+                }
+            }
+            
             this.term.focus();
         });
         
@@ -78,6 +97,13 @@ class SimpleIDE {
         
         this.socket.on('disconnect', () => {
             this.updateStatus('Disconnected', false);
+        });
+        
+        this.socket.on('terminal:exit', () => {
+            // Terminal process exited, clear session ID
+            this.sessionId = null;
+            localStorage.removeItem('terminal-session-id');
+            this.term.writeln('\r\n\x1b[31mTerminal process exited.\x1b[0m');
         });
         
         this.socket.on('files:list', (files) => {
@@ -118,15 +144,18 @@ class SimpleIDE {
             overlay.classList.remove('open');
         });
         
-        // Theme toggle
-        document.getElementById('theme-toggle').addEventListener('click', () => {
-            this.toggleTheme();
-        });
-        
         // Logout
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            if (confirm('Are you sure you want to logout?')) {
+        document.getElementById('logout-btn').addEventListener('click', async () => {
+            const confirmed = await this.showConfirmDialog(
+                'Logout Confirmation',
+                'Are you sure you want to logout? Your terminal session will be saved for 10 minutes.'
+            );
+            
+            if (confirmed) {
                 localStorage.removeItem('token');
+                localStorage.removeItem('terminal-session-id'); // Clear session ID
+                localStorage.removeItem('ide-theme'); // Clean up old theme setting
+                localStorage.removeItem('command-history'); // Clean up old command history
                 window.location.href = '/auth.html';
             }
         });
@@ -199,17 +228,16 @@ class SimpleIDE {
             });
         }
         
-        // Cmd button (runs common commands)
+        // Cmd button (shows command palette)
         const cmdBtn = document.getElementById('cmd-btn');
         if (cmdBtn) {
-            cmdBtn.addEventListener('click', () => {
-                const commands = ['ls -la', 'pwd', 'git status', 'npm run'];
-                const cmd = prompt('Enter command:', commands[0]);
-                if (cmd && this.socket && this.socket.connected) {
-                    this.socket.emit('terminal:data', cmd + '\r');
-                }
+            cmdBtn.addEventListener('click', async () => {
+                await this.showCommandPalette();
             });
         }
+        
+        // Setup command palette
+        this.setupCommandPalette();
         
         // Arrow keys toggle
         const arrowsToggle = document.getElementById('arrows-toggle');
@@ -264,33 +292,6 @@ class SimpleIDE {
                 if (btn) btn.classList.remove('active');
             }
         });
-    }
-    
-    loadTheme() {
-        const savedTheme = localStorage.getItem('ide-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        this.updateTerminalTheme(savedTheme);
-    }
-    
-    toggleTheme() {
-        const currentTheme = document.documentElement.getAttribute('data-theme');
-        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-        
-        document.documentElement.setAttribute('data-theme', newTheme);
-        localStorage.setItem('ide-theme', newTheme);
-        this.updateTerminalTheme(newTheme);
-    }
-    
-    updateTerminalTheme(theme) {
-        if (this.term) {
-            const isDark = theme === 'dark';
-            this.term.options.theme = {
-                background: isDark ? '#000000' : '#ffffff',
-                foreground: isDark ? '#ffffff' : '#000000',
-                cursor: isDark ? '#ffffff' : '#000000',
-                selection: isDark ? '#ffffff44' : '#00000044'
-            };
-        }
     }
     
     updateStatus(message, connected) {
@@ -471,6 +472,343 @@ class SimpleIDE {
         if (fileViewer) {
             fileViewer.style.display = 'none';
         }
+    }
+    
+    setupCommandPalette() {
+        const palette = document.getElementById('command-palette');
+        const closeBtn = document.getElementById('close-commands');
+        const commandList = document.getElementById('command-list');
+        const newCommandInput = document.getElementById('new-command-input');
+        const runBtn = document.getElementById('run-command');
+        
+        // Close button
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => {
+                this.hideCommandPalette();
+            });
+        }
+        
+        // Click on command items and action buttons
+        if (commandList) {
+            commandList.addEventListener('click', async (e) => {
+                const editBtn = e.target.closest('.cmd-action-btn.edit');
+                const deleteBtn = e.target.closest('.cmd-action-btn.delete');
+                const item = e.target.closest('.command-item');
+                
+                if (editBtn && item) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    this.editCommand(item);
+                    return;
+                }
+                
+                if (deleteBtn && item) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const cmdText = item.querySelector('.command-text').textContent;
+                    const confirmed = await this.showConfirmDialog(
+                        'Delete Command',
+                        `Are you sure you want to delete the command "${cmdText}"?`
+                    );
+                    if (confirmed) {
+                        await this.deleteCommand(item.dataset.id);
+                    }
+                    return;
+                }
+                
+                if (item && !item.classList.contains('editing') && !e.target.closest('.command-actions')) {
+                    const cmd = item.dataset.cmd;
+                    this.runCommand(cmd);
+                    this.hideCommandPalette();
+                }
+            });
+        }
+        
+        // Add command form
+        const addCommandForm = document.getElementById('add-command-form');
+        const newDescInput = document.getElementById('new-desc-input');
+        
+        if (addCommandForm) {
+            addCommandForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const cmd = newCommandInput.value.trim();
+                const desc = newDescInput.value.trim() || 'Custom command';
+                
+                if (cmd) {
+                    await this.addCommand(cmd, desc);
+                    newCommandInput.value = '';
+                    newDescInput.value = '';
+                    newCommandInput.focus();
+                }
+            });
+        }
+        
+        // Click outside to close
+        if (palette) {
+            palette.addEventListener('click', (e) => {
+                if (e.target === palette) {
+                    this.hideCommandPalette();
+                }
+            });
+        }
+    }
+    
+    async showCommandPalette() {
+        const palette = document.getElementById('command-palette');
+        const input = document.getElementById('new-command-input');
+        if (palette) {
+            palette.style.display = 'flex';
+            await this.loadCommands();
+            if (input) {
+                input.focus();
+            }
+        }
+    }
+    
+    hideCommandPalette() {
+        const palette = document.getElementById('command-palette');
+        if (palette) {
+            palette.style.display = 'none';
+        }
+    }
+    
+    runCommand(cmd) {
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('terminal:data', cmd + '\r');
+        }
+    }
+    
+    async loadCommands() {
+        const commandList = document.getElementById('command-list');
+        if (!commandList) return;
+        
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/commands', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.renderCommands(data.commands);
+            } else {
+                console.error('Failed to load commands:', response.status);
+                // Show default commands if API fails
+                this.renderDefaultCommands();
+            }
+        } catch (error) {
+            console.error('Error loading commands:', error);
+            // Show default commands if API fails
+            this.renderDefaultCommands();
+        }
+    }
+    
+    renderDefaultCommands() {
+        const defaultCommands = [
+            { id: 'default-1', cmd: 'ls -la', desc: 'List all files' },
+            { id: 'default-2', cmd: 'pwd', desc: 'Current directory' },
+            { id: 'default-3', cmd: 'git status', desc: 'Git status' },
+            { id: 'default-4', cmd: 'clear', desc: 'Clear terminal' }
+        ];
+        this.renderCommands(defaultCommands);
+    }
+    
+    renderCommands(commands) {
+        const commandList = document.getElementById('command-list');
+        if (!commandList) return;
+        
+        commandList.innerHTML = '';
+        
+        commands.forEach(cmd => {
+            const div = document.createElement('div');
+            div.className = 'command-item';
+            div.dataset.cmd = cmd.cmd;
+            div.dataset.id = cmd.id;
+            
+            div.innerHTML = `
+                <div class="command-content">
+                    <div class="command-text">${this.escapeHtml(cmd.cmd)}</div>
+                    <div class="command-desc">${this.escapeHtml(cmd.desc)}</div>
+                </div>
+                <div class="command-actions">
+                    <button class="cmd-action-btn edit">Edit</button>
+                    <button class="cmd-action-btn delete">Delete</button>
+                </div>
+            `;
+            
+            commandList.appendChild(div);
+        });
+    }
+    
+    async addCommand(cmd, desc) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch('/api/commands', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ cmd, desc })
+            });
+            
+            if (response.ok) {
+                await this.loadCommands();
+            } else {
+                this.showNotification('Failed to add command', 'error');
+            }
+        } catch (error) {
+            console.error('Error adding command:', error);
+            this.showNotification('Failed to add command', 'error');
+        }
+    }
+    
+    async deleteCommand(commandId) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${commandId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            
+            if (response.ok) {
+                await this.loadCommands();
+            } else {
+                this.showNotification('Failed to delete command', 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting command:', error);
+            this.showNotification('Failed to delete command', 'error');
+        }
+    }
+    
+    editCommand(item) {
+        const content = item.querySelector('.command-content');
+        const currentCmd = item.dataset.cmd;
+        const currentDesc = content.querySelector('.command-desc').textContent;
+        
+        item.classList.add('editing');
+        item.innerHTML = `
+            <form class="command-edit-form">
+                <input type="text" class="edit-input" id="edit-cmd" value="${this.escapeHtml(currentCmd)}" placeholder="Command">
+                <input type="text" class="edit-input" id="edit-desc" value="${this.escapeHtml(currentDesc)}" placeholder="Description">
+                <div class="edit-actions">
+                    <button type="submit" class="edit-btn save">Save</button>
+                    <button type="button" class="edit-btn cancel">Cancel</button>
+                </div>
+            </form>
+        `;
+        
+        const form = item.querySelector('form');
+        const cancelBtn = item.querySelector('.cancel');
+        
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newCmd = item.querySelector('#edit-cmd').value.trim();
+            const newDesc = item.querySelector('#edit-desc').value.trim();
+            
+            if (newCmd && newDesc) {
+                await this.updateCommand(item.dataset.id, newCmd, newDesc);
+            }
+        });
+        
+        cancelBtn.addEventListener('click', () => {
+            this.loadCommands();
+        });
+        
+        item.querySelector('#edit-cmd').focus();
+    }
+    
+    async updateCommand(commandId, cmd, desc) {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`/api/commands/${commandId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ cmd, desc })
+            });
+            
+            if (response.ok) {
+                await this.loadCommands();
+            } else {
+                this.showNotification('Failed to update command', 'error');
+            }
+        } catch (error) {
+            console.error('Error updating command:', error);
+            this.showNotification('Failed to update command', 'error');
+        }
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Show notification
+    showNotification(message, type = 'error') {
+        // Simple notification in terminal
+        const prefix = type === 'error' ? '\x1b[31m✗' : '\x1b[32m✓';
+        const suffix = '\x1b[0m';
+        this.term.writeln(`\r\n${prefix} ${message}${suffix}\r\n`);
+    }
+    
+    // Custom confirmation dialog
+    showConfirmDialog(title, message) {
+        return new Promise((resolve) => {
+            const overlay = document.getElementById('confirm-dialog-overlay');
+            const titleEl = document.getElementById('confirm-dialog-title');
+            const messageEl = document.getElementById('confirm-dialog-message');
+            const cancelBtn = document.getElementById('confirm-cancel');
+            const okBtn = document.getElementById('confirm-ok');
+            
+            // Set content
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            
+            // Show dialog
+            overlay.style.display = 'flex';
+            
+            // Handle buttons
+            const handleCancel = () => {
+                overlay.style.display = 'none';
+                resolve(false);
+                cleanup();
+            };
+            
+            const handleOk = () => {
+                overlay.style.display = 'none';
+                resolve(true);
+                cleanup();
+            };
+            
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    handleCancel();
+                }
+            };
+            
+            const cleanup = () => {
+                cancelBtn.removeEventListener('click', handleCancel);
+                okBtn.removeEventListener('click', handleOk);
+                document.removeEventListener('keydown', handleEscape);
+            };
+            
+            // Add event listeners
+            cancelBtn.addEventListener('click', handleCancel);
+            okBtn.addEventListener('click', handleOk);
+            document.addEventListener('keydown', handleEscape);
+            
+            // Focus on cancel button for safety
+            cancelBtn.focus();
+        });
     }
 }
 

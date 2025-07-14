@@ -25,15 +25,6 @@
                         <line x1="9" y1="3" x2="9" y2="21"/>
                     </svg>
                 </button>
-                <button id="theme-toggle" class="ide-btn" title="Toggle Theme">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"/>
-                        <line x1="12" y1="1" x2="12" y2="3"/>
-                        <line x1="12" y1="21" x2="12" y2="23"/>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                    </svg>
-                </button>
                 <button id="logout-btn" class="ide-btn" title="Logout">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
@@ -121,6 +112,24 @@
                         <pre><code id="file-code"></code></pre>
                     </div>
                 </div>
+                
+                <!-- Command Palette -->
+                <div class="command-palette" id="command-palette" style="display: none;">
+                    <div class="command-palette-header">
+                        <span>Quick Commands</span>
+                        <button class="close-btn" id="close-commands">×</button>
+                    </div>
+                    <div class="command-list" id="command-list">
+                        <!-- Commands will be loaded from server -->
+                    </div>
+                    <div class="command-input-wrapper">
+                        <form id="add-command-form" style="display: flex; gap: 8px; width: 100%;">
+                            <input type="text" class="command-input" id="new-command-input" placeholder="Command" style="flex: 1;">
+                            <input type="text" class="command-input" id="new-desc-input" placeholder="Description" style="flex: 1;">
+                            <button type="submit" class="command-run-btn">Add</button>
+                        </form>
+                    </div>
+                </div>
             </main>
         </div>
 
@@ -137,6 +146,25 @@
 
     <!-- Mobile Menu Overlay -->
     <div id="mobile-overlay" class="mobile-overlay"></div>
+
+    <!-- Confirmation Dialog -->
+    <div class="confirm-dialog-overlay" id="confirm-dialog-overlay" style="display: none;">
+        <div class="confirm-dialog">
+            <div class="confirm-dialog-icon">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            </div>
+            <h3 class="confirm-dialog-title" id="confirm-dialog-title">Confirm Action</h3>
+            <p class="confirm-dialog-message" id="confirm-dialog-message">Are you sure?</p>
+            <div class="confirm-dialog-buttons">
+                <button class="confirm-btn confirm-btn-cancel" id="confirm-cancel">Cancel</button>
+                <button class="confirm-btn confirm-btn-ok" id="confirm-ok">Confirm</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://unpkg.com/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://unpkg.com/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>

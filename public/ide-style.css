@@ -13,17 +13,6 @@
     --status-error: #f44747;
 }
 
-[data-theme="light"] {
-    --bg-primary: #ffffff;
-    --bg-secondary: #f3f3f3;
-    --bg-hover: #e8e8e8;
-    --bg-active: #e4f3ff;
-    --text-primary: #333333;
-    --text-secondary: #666666;
-    --border: #e0e0e0;
-    --accent: #0066cc;
-}
-
 * {
     margin: 0;
     padding: 0;
@@ -524,6 +513,289 @@ body {
     color: var(--text-primary);
 }
 
+/* Command Palette */
+.command-palette {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    z-index: 15;
+    display: flex;
+    flex-direction: column;
+}
+
+.command-palette-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 8px;
+    border-radius: 4px;
+}
+
+.close-btn:hover {
+    background: var(--bg-hover);
+}
+
+.command-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.command-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.command-item:hover {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+}
+
+.command-item:hover .command-actions {
+    opacity: 1;
+}
+
+.command-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.command-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: 12px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+}
+
+/* Mobile-optimized layout */
+@media (max-width: 768px) {
+    .command-item {
+        padding: 14px;
+        margin-bottom: 10px;
+    }
+    
+    .command-actions {
+        opacity: 1;
+    }
+    
+    .command-content {
+        gap: 6px;
+    }
+}
+
+.cmd-action-btn {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.cmd-action-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--accent);
+}
+
+.cmd-action-btn.delete:hover {
+    background: rgba(244, 71, 71, 0.1);
+    color: var(--status-error);
+    border-color: var(--status-error);
+}
+
+@media (max-width: 768px) {
+    .cmd-action-btn {
+        padding: 8px 14px;
+        font-size: 13px;
+    }
+}
+
+/* All commands can now be edited/deleted */
+
+/* Edit mode */
+.command-item.editing {
+    padding: 12px;
+}
+
+.command-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+}
+
+.edit-input {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 4px;
+    width: 100%;
+}
+
+.edit-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.edit-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.edit-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.edit-btn.save {
+    background: var(--accent);
+    color: white;
+}
+
+.edit-btn.cancel {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    .command-item.editing {
+        padding: 14px;
+    }
+    
+    .edit-input {
+        padding: 12px 14px;
+        font-size: 15px;
+    }
+    
+    .edit-btn {
+        padding: 10px 18px;
+        font-size: 14px;
+    }
+}
+
+.command-text {
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    font-size: 14px;
+    color: var(--accent);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.command-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .command-text {
+        font-size: 15px;
+    }
+    
+    .command-desc {
+        font-size: 13px;
+    }
+}
+
+.command-input-wrapper {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+    #add-command-form {
+        flex-direction: column;
+    }
+    
+    .command-input-wrapper .command-input {
+        width: 100%;
+    }
+}
+
+.command-input {
+    flex: 1;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'SF Mono', Monaco, Consolas, monospace;
+    border-radius: 4px;
+}
+
+.command-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.command-run-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.command-run-btn:hover {
+    background: #0088dd;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .mobile-controls {
@@ -545,5 +817,152 @@ body {
         width: 36px;
         height: 36px;
         font-size: 16px;
+    }
+    
+    .command-palette {
+        width: 92%;
+        max-width: none;
+        max-height: 85vh;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    
+    .command-list {
+        max-height: 50vh;
+        padding: 12px;
+    }
+    
+    .command-palette-header {
+        padding: 16px;
+        font-size: 16px;
+    }
+}
+
+/* Confirmation Dialog */
+.confirm-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.confirm-dialog {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    max-width: 400px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.confirm-dialog-icon {
+    margin-bottom: 20px;
+    color: var(--accent);
+}
+
+.confirm-dialog-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text-primary);
+}
+
+.confirm-dialog-message {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+    line-height: 1.5;
+}
+
+.confirm-dialog-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.confirm-btn {
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 100px;
+}
+
+.confirm-btn-cancel {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+
+.confirm-btn-cancel:hover {
+    background: var(--bg-active);
+    border-color: var(--accent);
+}
+
+.confirm-btn-ok {
+    background: var(--accent);
+    color: white;
+}
+
+.confirm-btn-ok:hover {
+    background: #0088dd;
+    transform: translateY(-1px);
+}
+
+.confirm-btn:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 768px) {
+    .confirm-dialog {
+        padding: 24px;
+    }
+    
+    .confirm-dialog-title {
+        font-size: 18px;
+    }
+    
+    .confirm-dialog-message {
+        font-size: 15px;
+    }
+    
+    .confirm-btn {
+        padding: 12px 24px;
+        font-size: 15px;
     }
 }

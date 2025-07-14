@@ -220,7 +220,6 @@
         <div class="auth-footer">
             <p>Professional development environment in your browser</p>
             <p style="margin-top: 8px;">
-                <a href="#" id="theme-toggle-link">Toggle Theme</a> • 
                 <a href="https://github.com/anthropics/claude-code" target="_blank">Documentation</a>
             </p>
         </div>
@@ -245,17 +244,6 @@
             window.location.href = '/';
         }
         
-        // Theme handling
-        const savedTheme = localStorage.getItem('ide-theme') || 'dark';
-        document.documentElement.setAttribute('data-theme', savedTheme);
-        
-        document.getElementById('theme-toggle-link').addEventListener('click', (e) => {
-            e.preventDefault();
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('ide-theme', newTheme);
-        });
         
         // Hide all messages
         function hideMessages() {

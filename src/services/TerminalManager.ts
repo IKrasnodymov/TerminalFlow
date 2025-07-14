@@ -6,20 +6,77 @@ import { logger } from '../utils/logger';
 
 export class TerminalManager {
   private terminals = new Map<string, TerminalSession>();
+  private sessionsByUserId = new Map<string, string>(); // userId -> sessionId mapping
   private readonly cleanupInterval: NodeJS.Timeout;
+  private readonly SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
   constructor() {
-    // Clean up inactive terminals every 5 minutes
+    // Clean up inactive terminals every minute
     this.cleanupInterval = setInterval(() => {
       this.cleanupInactiveTerminals();
-    }, 5 * 60 * 1000);
+    }, 60 * 1000);
+  }
+  
+  private generateSessionId(): string {
+    return `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  async createOrReuseTerminal(
+    socketId: string, 
+    userId: string, 
+    sessionId?: string,
+    options: Partial<TerminalOptions> = {}
+  ): Promise<{ session: TerminalSession; sessionId: string; isNew: boolean }> {
+    try {
+      // Check if user has an existing session
+      const existingSessionId = sessionId || this.sessionsByUserId.get(userId);
+      
+      if (existingSessionId) {
+        // Try to find existing terminal session
+        for (const [terminalId, session] of this.terminals.entries()) {
+          if ((session as any).sessionId === existingSessionId && session.userId === userId) {
+            // Found existing session, update socket ID
+            logger.info('Reusing existing terminal session', {
+              sessionId: existingSessionId,
+              oldSocketId: terminalId,
+              newSocketId: socketId,
+              userId
+            });
+            
+            // Move session to new socket ID
+            this.terminals.delete(terminalId);
+            (session as any).socketId = socketId;
+            session.lastActivity = new Date();
+            this.terminals.set(socketId, session);
+            
+            // Resize if needed
+            if (options.cols && options.rows) {
+              const { cols, rows } = validateTerminalDimensions(options.cols, options.rows);
+              session.pty.resize(cols, rows);
+            }
+            
+            return { session, sessionId: existingSessionId, isNew: false };
+          }
+        }
+      }
+      
+      // No existing session found, create new one
+      return await this.createTerminal(socketId, userId, options);
+    } catch (error) {
+      logger.error('Failed to create or reuse terminal', {
+        socketId,
+        userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      throw error;
+    }
   }
 
   async createTerminal(
     socketId: string, 
     userId: string, 
     options: Partial<TerminalOptions> = {}
-  ): Promise<TerminalSession> {
+  ): Promise<{ session: TerminalSession; sessionId: string; isNew: boolean }> {
     try {
       // Validate dimensions
       const { cols, rows } = validateTerminalDimensions(
@@ -58,22 +115,29 @@ export class TerminalManager {
         env
       });
 
+      const sessionId = this.generateSessionId();
       const session: TerminalSession = {
         pty: terminal,
         userId,
         createdAt: new Date(),
         lastActivity: new Date()
       };
+      
+      // Add session ID to the session object
+      (session as any).sessionId = sessionId;
+      (session as any).socketId = socketId;
 
       this.terminals.set(socketId, session);
+      this.sessionsByUserId.set(userId, sessionId);
 
       logger.info('Terminal created successfully', {
         socketId,
+        sessionId,
         userId,
         pid: terminal.pid
       });
 
-      return session;
+      return { session, sessionId, isNew: true };
     } catch (error) {
       logger.error('Failed to create terminal', {
         socketId,
@@ -92,15 +156,41 @@ export class TerminalManager {
     return session;
   }
 
-  async destroyTerminal(socketId: string): Promise<void> {
+  async disconnectTerminal(socketId: string): Promise<void> {
     const session = this.terminals.get(socketId);
     if (!session) {
       return;
     }
 
+    // Mark as disconnected but don't destroy immediately
+    logger.info('Disconnecting terminal (keeping alive for reconnection)', {
+      socketId,
+      sessionId: (session as any).sessionId,
+      userId: session.userId
+    });
+
+    // Update last activity
+    session.lastActivity = new Date();
+    
+    // Clear socket ID to mark as disconnected
+    (session as any).socketId = undefined;
+  }
+
+  async destroyTerminal(socketId: string, force: boolean = false): Promise<void> {
+    const session = this.terminals.get(socketId);
+    if (!session) {
+      return;
+    }
+
+    // If not forcing and session has a sessionId, just disconnect
+    if (!force && (session as any).sessionId) {
+      return this.disconnectTerminal(socketId);
+    }
+
     try {
       logger.info('Destroying terminal', {
         socketId,
+        sessionId: (session as any).sessionId,
         userId: session.userId,
         pid: session.pty.pid
       });
@@ -108,11 +198,18 @@ export class TerminalManager {
       // Kill the PTY process
       session.pty.kill();
       
-      // Remove from map
+      // Remove from maps
       this.terminals.delete(socketId);
+      
+      // Remove user session mapping if this was the active session
+      const sessionId = (session as any).sessionId;
+      if (sessionId && this.sessionsByUserId.get(session.userId) === sessionId) {
+        this.sessionsByUserId.delete(session.userId);
+      }
 
       logger.info('Terminal destroyed successfully', {
         socketId,
+        sessionId,
         userId: session.userId
       });
     } catch (error) {
@@ -195,19 +292,21 @@ export class TerminalManager {
 
   private cleanupInactiveTerminals(): void {
     const now = new Date();
-    const maxInactiveTime = 30 * 60 * 1000; // 30 minutes
     
     for (const [socketId, session] of this.terminals.entries()) {
       const inactiveTime = now.getTime() - session.lastActivity.getTime();
+      const isDisconnected = !(session as any).socketId;
       
-      if (inactiveTime > maxInactiveTime) {
-        logger.info('Cleaning up inactive terminal', {
+      // Only cleanup disconnected sessions after timeout
+      if (isDisconnected && inactiveTime > this.SESSION_TIMEOUT) {
+        logger.info('Cleaning up inactive terminal session', {
           socketId,
+          sessionId: (session as any).sessionId,
           userId: session.userId,
           inactiveTime: Math.floor(inactiveTime / 1000 / 60) + ' minutes'
         });
         
-        this.destroyTerminal(socketId).catch(error => {
+        this.destroyTerminal(socketId, true).catch(error => {
           logger.error('Failed to cleanup inactive terminal', {
             socketId,
             error: error instanceof Error ? error.message : 'Unknown error'
