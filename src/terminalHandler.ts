@@ -9,9 +9,13 @@ import {
   ServerToClientEvents,
   ClientToServerEvents
 } from './types';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Create global terminal manager instance
 const terminalManager = new TerminalManager();
+
+
 
 export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToClientEvents>) {
   io.on('connection', (socket) => {
@@ -37,6 +41,7 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
 
         // Set up data handler
         session.pty.onData((data: string) => {
+          // Send data as-is without filtering
           socket.emit('terminal:data', data);
         });
 
@@ -130,6 +135,58 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
       }
     });
 
+    // Handle file listing
+    socket.on('files:list' as any, async (requestPath: string = '/') => {
+      try {
+        const basePath = process.cwd();
+        const files = await getFileList(basePath, '');
+        socket.emit('files:list' as any, files);
+      } catch (error) {
+        logger.error('Failed to list files', {
+          socketId: socket.id,
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        socket.emit('files:error' as any, 'Failed to list files');
+      }
+    });
+
+    // Handle file reading
+    socket.on('file:read' as any, async (filePath: string) => {
+      try {
+        // Security check - ensure path is within project directory
+        const basePath = process.cwd();
+        const fullPath = path.join(basePath, filePath.startsWith('/') ? filePath.slice(1) : filePath);
+        const resolvedPath = path.resolve(fullPath);
+        
+        if (!resolvedPath.startsWith(basePath)) {
+          throw new Error('Access denied: Path outside project directory');
+        }
+        
+        // Read file content
+        const content = await fs.readFile(resolvedPath, 'utf-8');
+        
+        // Limit file size for browser
+        const maxSize = 1024 * 1024; // 1MB
+        const truncatedContent = content.length > maxSize 
+          ? content.substring(0, maxSize) + '\n\n... File truncated (too large) ...'
+          : content;
+        
+        socket.emit('file:content' as any, {
+          path: filePath,
+          content: truncatedContent
+        });
+      } catch (error) {
+        logger.error('Failed to read file', {
+          socketId: socket.id,
+          userId,
+          filePath,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+        socket.emit('file:error' as any, 'Failed to read file');
+      }
+    });
+
     // Handle client disconnect
     socket.on('disconnect', async (reason) => {
       logger.info('Client disconnected', {
@@ -160,6 +217,42 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
     logger.info('Destroying all terminal sessions due to SIGINT');
     terminalManager.destroy();
   });
+}
+
+// Helper function to get file list
+async function getFileList(basePath: string, relativePath: string, depth = 0, maxDepth = 3): Promise<Array<{path: string}>> {
+  const files: Array<{path: string}> = [];
+  
+  if (depth > maxDepth) return files;
+  
+  try {
+    const fullPath = path.join(basePath, relativePath);
+    const entries = await fs.readdir(fullPath, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const entryPath = path.join(relativePath, entry.name);
+      
+      // Skip hidden files, node_modules, and common build directories
+      if (entry.name.startsWith('.') || 
+          entry.name === 'node_modules' || 
+          entry.name === 'dist' ||
+          entry.name === 'build' ||
+          entry.name === '.git') {
+        continue;
+      }
+      
+      if (entry.isDirectory()) {
+        const subFiles = await getFileList(basePath, entryPath, depth + 1, maxDepth);
+        files.push(...subFiles);
+      } else {
+        files.push({ path: '/' + entryPath.replace(/\\/g, '/') });
+      }
+    }
+  } catch (error) {
+    logger.error('Error reading directory', { error, path: relativePath });
+  }
+  
+  return files;
 }
 
 // Export terminal manager for health checks or admin endpoints

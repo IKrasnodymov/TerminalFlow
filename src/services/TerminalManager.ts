@@ -225,7 +225,7 @@ export class TerminalManager {
     const sanitized: Record<string, string> = {};
     
     // Only allow safe environment variables
-    const allowedVars = ['TERM', 'LANG', 'LC_ALL', 'EDITOR', 'PAGER'];
+    const allowedVars = ['TERM', 'LANG', 'LC_ALL', 'EDITOR', 'PAGER', 'NO_COLOR', 'FORCE_COLOR', 'CI', 'DEBIAN_FRONTEND', 'NO_TTY', 'NONINTERACTIVE', 'CLAUDE_CLI_DISABLE_FANCY_UI', 'CLAUDE_CLI_SIMPLE_MODE'];
     
     for (const [key, value] of Object.entries(customEnv)) {
       if (allowedVars.includes(key) && typeof value === 'string') {

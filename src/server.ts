@@ -52,6 +52,39 @@ app.get('/health', asyncHandler(async (req, res) => {
   res.json(response);
 }));
 
+// Token validation endpoint
+app.post('/auth/validate-token', asyncHandler(async (req, res) => {
+  const { token } = req.body;
+  
+  if (!token) {
+    return res.status(400).json({ 
+      error: 'Token is required',
+      valid: false 
+    });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret) as JWTPayload;
+    res.json({ 
+      valid: true, 
+      decoded: {
+        ip: decoded.ip,
+        exp: decoded.exp,
+        iat: decoded.iat
+      }
+    });
+  } catch (error) {
+    logger.warn('Invalid token validation attempt', { 
+      error: error instanceof Error ? error.message : 'Unknown error',
+      ip: req.ip 
+    });
+    res.status(401).json({ 
+      error: 'Invalid or expired token',
+      valid: false 
+    });
+  }
+}));
+
 // Email access code request endpoint
 app.post('/auth/request-code', rateLimiter.middleware, asyncHandler(async (req, res) => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
@@ -176,6 +209,7 @@ app.get('/admin/stats', asyncHandler(async (req, res) => {
   const stats = rateLimiter.getStats();
   res.json(stats);
 }));
+
 
 // Socket.IO authentication middleware
 io.use(authMiddleware);

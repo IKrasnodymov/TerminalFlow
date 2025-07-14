@@ -16,6 +16,7 @@ export interface AuthResponse {
 
 export interface JWTPayload {
   userId: string;
+  ip?: string;
   iat?: number;
   exp?: number;
 }

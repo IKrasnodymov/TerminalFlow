@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Simple wrapper for Claude Code that forces batch mode
+export TERM=dumb
+export NO_COLOR=1
+export FORCE_COLOR=0
+export CI=true
+export GITHUB_ACTIONS=true
+export DEBIAN_FRONTEND=noninteractive
+
+# Use echo to simulate simple interaction instead of complex UI
+if [ $# -eq 0 ]; then
+    echo "Claude Code - Web Terminal Mode"
+    echo "Usage: claude-simple \"your question here\""
+    echo "Example: claude-simple \"write a test for app.js\""
+    exit 0
+fi
+
+# Create a temporary input file
+TMPFILE=$(mktemp)
+echo "$*" > "$TMPFILE"
+
+# Run claude in batch mode by redirecting input
+echo "Processing: $*"
+claude < "$TMPFILE" 2>/dev/null || echo "Error: Claude Code not found or failed"
+
+# Cleanup
+rm -f "$TMPFILE"

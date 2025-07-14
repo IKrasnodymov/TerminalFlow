@@ -158,6 +158,39 @@ cloudflared tunnel --url localhost:3000
 2. **Gmail**: Enable 2FA, create App Password for SMTP access
 3. Development mode works without email configuration (codes in console)
 
+## Using Claude Code in Web Terminal
+
+The web terminal supports Claude Code CLI with optimizations for mobile and web browsers:
+
+### Claude Code Usage
+
+**Standard mode (may have UI issues):**
+```bash
+claude "write a test for app.js"
+```
+
+**Simple mode (recommended for web terminal):**
+```bash
+./claude-simple "write a test for app.js"
+./claude-simple --help
+```
+
+**Direct command mode:**
+```bash
+echo "write a test for app.js" | claude
+```
+
+### Terminal Features
+- **Mobile-optimized**: Works on phones and tablets through browser
+- **Touch controls**: Virtual keyboard support
+- **Session persistence**: 24-hour token-based authentication
+- **Real-time**: Full bidirectional terminal I/O
+
+### Known Issues
+- Complex UI elements may occasionally duplicate (filtered automatically)
+- Some escape sequences optimized for web compatibility
+- Use `Ctrl+C` if Claude Code interface becomes unresponsive
+
 ## Key Implementation Details
 
 ### Error Handling

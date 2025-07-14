@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Ultra-simple Claude Code wrapper for web terminal
+# This completely bypasses the interactive UI
+
+if [ $# -eq 0 ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  Claude Code - Web Terminal Mode"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    echo "Usage:"
+    echo "  claude-batch \"your question here\""
+    echo ""
+    echo "Examples:"
+    echo "  claude-batch \"write a test for app.js\""
+    echo "  claude-batch \"explain how this function works\""
+    echo "  claude-batch \"help me debug this error\""
+    echo ""
+    echo "Note: This runs Claude in batch mode to avoid UI conflicts in web terminal."
+    echo ""
+    exit 0
+fi
+
+# Set environment for simple output
+export TERM=dumb
+export NO_COLOR=1
+export FORCE_COLOR=0
+export CI=true
+
+# Show what we're processing
+echo "┌─ Processing your request..."
+echo "│ Question: $*"
+echo "└─ Waiting for Claude..."
+echo ""
+
+# Try to run Claude with input redirection to avoid interactive mode
+(echo "$*"; echo "") | timeout 30 claude 2>/dev/null | sed 's/^/  /' || {
+    echo "❌ Error: Could not get response from Claude Code"
+    echo "   Make sure Claude Code CLI is installed and working"
+    echo "   Try: npm install -g @anthropic/claude-cli"
+}
+
+echo ""

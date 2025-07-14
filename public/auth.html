@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Terminal IDE - Authentication</title>
+    <link rel="stylesheet" href="ide-style.css">
+    <style>
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: var(--ide-bg-primary);
+        }
+        
+        .auth-container {
+            width: 100%;
+            max-width: 400px;
+            padding: 40px;
+            background: var(--ide-bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--ide-border-primary);
+            box-shadow: var(--ide-shadow-xl);
+        }
+        
+        .auth-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .auth-logo-icon {
+            width: 48px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--ide-accent-primary);
+            border-radius: 12px;
+            color: white;
+        }
+        
+        .auth-logo h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--ide-text-primary);
+            margin: 0;
+        }
+        
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .form-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--ide-text-secondary);
+        }
+        
+        .form-input {
+            height: 40px;
+            padding: 0 12px;
+            background: var(--ide-bg-tertiary);
+            border: 1px solid var(--ide-border-primary);
+            border-radius: 6px;
+            color: var(--ide-text-primary);
+            font-size: 14px;
+            transition: all var(--ide-transition-fast);
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: var(--ide-accent-primary);
+            background: var(--ide-bg-primary);
+        }
+        
+        .form-button {
+            height: 40px;
+            background: var(--ide-accent-primary);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--ide-transition-fast);
+        }
+        
+        .form-button:hover {
+            background: var(--ide-accent-secondary);
+            transform: translateY(-1px);
+            box-shadow: var(--ide-shadow-md);
+        }
+        
+        .form-button:active {
+            transform: translateY(0);
+        }
+        
+        .form-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .auth-message {
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        .auth-message.error {
+            background: rgba(244, 71, 71, 0.1);
+            color: var(--ide-accent-error);
+            border: 1px solid rgba(244, 71, 71, 0.2);
+        }
+        
+        .auth-message.success {
+            background: rgba(78, 201, 176, 0.1);
+            color: var(--ide-accent-success);
+            border: 1px solid rgba(78, 201, 176, 0.2);
+        }
+        
+        .auth-message.info {
+            background: rgba(55, 148, 255, 0.1);
+            color: var(--ide-accent-info);
+            border: 1px solid rgba(55, 148, 255, 0.2);
+        }
+        
+        .auth-footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 12px;
+            color: var(--ide-text-muted);
+        }
+        
+        .auth-footer a {
+            color: var(--ide-accent-primary);
+            text-decoration: none;
+        }
+        
+        .auth-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-logo">
+            <div class="auth-logo-icon">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M7 10l3 3-3 3M12 17h5"/>
+                </svg>
+            </div>
+            <h1>Terminal IDE</h1>
+        </div>
+        
+        <form class="auth-form" id="auth-form">
+            <div id="error-msg" class="auth-message error" style="display: none;"></div>
+            <div id="success-msg" class="auth-message success" style="display: none;"></div>
+            <div id="info-msg" class="auth-message info" style="display: none;"></div>
+            
+            <!-- Email Request Form -->
+            <div id="email-form" style="display: block;">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" class="form-input" id="email-input" placeholder="your@email.com" required>
+                </div>
+                <button type="button" class="form-button" id="request-code-btn">
+                    <span id="request-code-text">Request Access Code</span>
+                    <span id="request-code-loading" style="display: none;">
+                        <span class="loading-spinner"></span> Sending...
+                    </span>
+                </button>
+            </div>
+            
+            <!-- Code Verification Form -->
+            <div id="code-form" style="display: none;">
+                <div class="form-group">
+                    <label class="form-label">Enter 6-digit Code</label>
+                    <input type="text" class="form-input" id="code-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+                </div>
+                <button type="button" class="form-button" id="verify-code-btn">
+                    <span id="verify-code-text">Verify Code</span>
+                    <span id="verify-code-loading" style="display: none;">
+                        <span class="loading-spinner"></span> Verifying...
+                    </span>
+                </button>
+                <button type="button" class="form-button" id="request-new-btn" style="margin-top: 8px; background: var(--ide-bg-tertiary); color: var(--ide-text-primary);">
+                    Request New Code
+                </button>
+            </div>
+        </form>
+        
+        <div class="auth-footer">
+            <p>Professional development environment in your browser</p>
+            <p style="margin-top: 8px;">
+                <a href="#" id="theme-toggle-link">Toggle Theme</a> • 
+                <a href="https://github.com/anthropics/claude-code" target="_blank">Documentation</a>
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Simple authentication script
+        const emailForm = document.getElementById('email-form');
+        const codeForm = document.getElementById('code-form');
+        const errorMsg = document.getElementById('error-msg');
+        const successMsg = document.getElementById('success-msg');
+        const infoMsg = document.getElementById('info-msg');
+        const emailInput = document.getElementById('email-input');
+        const codeInput = document.getElementById('code-input');
+        const requestBtn = document.getElementById('request-code-btn');
+        const verifyBtn = document.getElementById('verify-code-btn');
+        const requestNewBtn = document.getElementById('request-new-btn');
+        
+        // Check for existing token
+        const token = localStorage.getItem('token');
+        if (token) {
+            window.location.href = '/';
+        }
+        
+        // Theme handling
+        const savedTheme = localStorage.getItem('ide-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        document.getElementById('theme-toggle-link').addEventListener('click', (e) => {
+            e.preventDefault();
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('ide-theme', newTheme);
+        });
+        
+        // Hide all messages
+        function hideMessages() {
+            errorMsg.style.display = 'none';
+            successMsg.style.display = 'none';
+            infoMsg.style.display = 'none';
+        }
+        
+        // Request code
+        requestBtn.addEventListener('click', async () => {
+            hideMessages();
+            const email = emailInput.value.trim();
+            
+            if (!email) {
+                errorMsg.textContent = 'Please enter your email address';
+                errorMsg.style.display = 'block';
+                return;
+            }
+            
+            // Set loading state
+            requestBtn.disabled = true;
+            document.getElementById('request-code-text').style.display = 'none';
+            document.getElementById('request-code-loading').style.display = 'inline-flex';
+            
+            try {
+                const response = await fetch('/auth/request-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    successMsg.textContent = data.message || 'Code sent successfully!';
+                    successMsg.style.display = 'block';
+                    emailForm.style.display = 'none';
+                    codeForm.style.display = 'block';
+                    codeInput.focus();
+                } else {
+                    errorMsg.textContent = data.error || 'Failed to send code';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (error) {
+                errorMsg.textContent = 'Network error. Please try again.';
+                errorMsg.style.display = 'block';
+            } finally {
+                requestBtn.disabled = false;
+                document.getElementById('request-code-text').style.display = 'inline';
+                document.getElementById('request-code-loading').style.display = 'none';
+            }
+        });
+        
+        // Verify code
+        verifyBtn.addEventListener('click', async () => {
+            hideMessages();
+            const code = codeInput.value.trim();
+            
+            if (!code || code.length !== 6) {
+                errorMsg.textContent = 'Please enter a 6-digit code';
+                errorMsg.style.display = 'block';
+                return;
+            }
+            
+            // Set loading state
+            verifyBtn.disabled = true;
+            document.getElementById('verify-code-text').style.display = 'none';
+            document.getElementById('verify-code-loading').style.display = 'inline-flex';
+            
+            try {
+                const response = await fetch('/auth/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accessCode: code })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.token) {
+                    localStorage.setItem('token', data.token);
+                    successMsg.textContent = 'Authentication successful! Redirecting...';
+                    successMsg.style.display = 'block';
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 1000);
+                } else {
+                    errorMsg.textContent = data.error || 'Invalid code';
+                    errorMsg.style.display = 'block';
+                }
+            } catch (error) {
+                errorMsg.textContent = 'Network error. Please try again.';
+                errorMsg.style.display = 'block';
+            } finally {
+                verifyBtn.disabled = false;
+                document.getElementById('verify-code-text').style.display = 'inline';
+                document.getElementById('verify-code-loading').style.display = 'none';
+            }
+        });
+        
+        // Request new code
+        requestNewBtn.addEventListener('click', () => {
+            hideMessages();
+            emailForm.style.display = 'block';
+            codeForm.style.display = 'none';
+            codeInput.value = '';
+            emailInput.focus();
+        });
+        
+        // Auto-focus code input as user types
+        codeInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
+            if (e.target.value.length === 6) {
+                verifyBtn.click();
+            }
+        });
+        
+        // Enter key handling
+        emailInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                requestBtn.click();
+            }
+        });
+        
+        codeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                verifyBtn.click();
+            }
+        });
+    </script>
+</body>
+</html>
