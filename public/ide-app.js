@@ -15,7 +15,7 @@ class SimpleIDE {
         // Check authentication
         const token = localStorage.getItem('token');
         if (!token) {
-            window.location.href = '/auth.html';
+            window.location.href = '/';
             return;
         }
         
@@ -104,6 +104,23 @@ class SimpleIDE {
             this.sessionId = null;
             localStorage.removeItem('terminal-session-id');
             this.term.writeln('\r\n\x1b[31mTerminal process exited.\x1b[0m');
+            this.term.writeln('\x1b[33mPress Ctrl+R to start a new session or refresh the page.\x1b[0m\r\n');
+            
+            // Disable terminal input
+            this.term.options.disableStdin = true;
+            
+            // Update status
+            this.updateStatus('Session Ended', false);
+            
+            // Add keyboard shortcut for restart
+            const restartHandler = (e) => {
+                if (e.ctrlKey && e.key === 'r') {
+                    e.preventDefault();
+                    document.removeEventListener('keydown', restartHandler);
+                    this.restartTerminal();
+                }
+            };
+            document.addEventListener('keydown', restartHandler);
         });
         
         this.socket.on('files:list', (files) => {
@@ -144,19 +161,18 @@ class SimpleIDE {
             overlay.classList.remove('open');
         });
         
-        // Logout
+        // Logout (Exit terminal)
         document.getElementById('logout-btn').addEventListener('click', async () => {
             const confirmed = await this.showConfirmDialog(
-                'Logout Confirmation',
-                'Are you sure you want to logout? Your terminal session will be saved for 10 minutes.'
+                'Exit Terminal',
+                'Are you sure you want to exit the terminal session?'
             );
             
             if (confirmed) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('terminal-session-id'); // Clear session ID
-                localStorage.removeItem('ide-theme'); // Clean up old theme setting
-                localStorage.removeItem('command-history'); // Clean up old command history
-                window.location.href = '/auth.html';
+                // Send exit command to terminal
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('terminal:data', 'exit\r');
+                }
             }
         });
         
@@ -750,6 +766,27 @@ class SimpleIDE {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    // Restart terminal session
+    restartTerminal() {
+        // Clear old session
+        this.sessionId = null;
+        localStorage.removeItem('terminal-session-id');
+        
+        // Clear terminal
+        this.term.clear();
+        
+        // Re-enable input
+        this.term.options.disableStdin = false;
+        
+        // Create new terminal session
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('terminal:create', {
+                cols: this.term.cols,
+                rows: this.term.rows
+            });
+        }
     }
     
     // Show notification

@@ -209,10 +209,10 @@ async function verifyAccessCode() {
         }
 
         localStorage.setItem('token', data.token);
-        showSuccess('Код принят! Подключаемся к терминалу...');
+        showSuccess('Код принят! Переходим в терминал...');
         
         setTimeout(() => {
-            connectToTerminal(data.token);
+            window.location.href = '/terminal.html';
         }, 1000);
 
     } catch (error) {
