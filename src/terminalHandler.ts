@@ -15,6 +15,9 @@ import path from 'path';
 // Create global terminal manager instance
 const terminalManager = new TerminalManager();
 
+// Map to track which terminalId belongs to which socket
+const terminalSocketMap = new Map<string, string>(); // terminalId -> socketId
+
 
 
 export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToClientEvents>) {
@@ -30,12 +33,18 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
     // Handle terminal creation
     socket.on('terminal:create', async (options: TerminalCreateEvent = {}) => {
       try {
-        // Check if options includes a sessionId for reconnection
+        // Extract terminalId and sessionId from options
+        const terminalId = (options as any).terminalId;
         const sessionId = (options as any).sessionId;
+        
+        if (!terminalId) {
+          throw new ValidationError('Terminal ID is required');
+        }
         
         const result = await terminalManager.createOrReuseTerminal(
           socket.id,
           userId,
+          terminalId,
           sessionId,
           {
             cols: options.cols,
@@ -43,34 +52,47 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
           }
         );
 
+        // Store terminal mapping
+        const fullTerminalId = `${userId}-${terminalId}`;
+        terminalSocketMap.set(fullTerminalId, socket.id);
+        
         // Set up data handler (only for new sessions, existing ones already have it)
         if (result.isNew) {
           result.session.pty.onData((data: string) => {
             // Send data as-is without filtering
-            socket.emit('terminal:data', data);
+            (socket as any).emit('terminal:data', {
+              terminalId,
+              data
+            });
           });
 
           // Set up exit handler
           result.session.pty.onExit((e) => {
             logger.info('Terminal process exited', {
               socketId: socket.id,
+              terminalId,
               userId,
               exitCode: e.exitCode,
               signal: e.signal
             });
             
-            socket.emit('terminal:exit');
+            (socket as any).emit('terminal:exit', { terminalId });
             terminalManager.destroyTerminal(socket.id, true); // Force destroy on exit
+            terminalSocketMap.delete(fullTerminalId);
           });
         } else {
           // For reconnected sessions, we need to re-attach the data handler
           result.session.pty.onData((data: string) => {
-            socket.emit('terminal:data', data);
+            (socket as any).emit('terminal:data', {
+              terminalId,
+              data
+            });
           });
         }
 
         // Send session info to client (cast to any since we're extending the API)
         (socket as any).emit('terminal:ready', {
+          terminalId,
           sessionId: result.sessionId,
           isNew: result.isNew
         });
@@ -97,8 +119,14 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
     });
 
     // Handle terminal data input
-    socket.on('terminal:data', async (data: string) => {
+    socket.on('terminal:data', async (input: any) => {
       try {
+        // Extract terminalId and data
+        const { terminalId, data } = input;
+        if (!terminalId || !data) {
+          throw new ValidationError('Terminal ID and data are required');
+        }
+        
         const validatedData = validateTerminalData(data);
         await terminalManager.writeToTerminal(socket.id, validatedData);
         
@@ -122,15 +150,22 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
     });
 
     // Handle terminal resize
-    socket.on('terminal:resize', async (options: TerminalResizeEvent) => {
+    socket.on('terminal:resize', async (input: any) => {
       try {
-        await terminalManager.resizeTerminal(socket.id, options.cols, options.rows);
+        // Extract terminalId and dimensions
+        const { terminalId, cols, rows } = input;
+        if (!terminalId) {
+          throw new ValidationError('Terminal ID is required');
+        }
+        
+        await terminalManager.resizeTerminal(socket.id, cols, rows);
         
         logger.debug('Terminal resized', {
           socketId: socket.id,
           userId,
-          cols: options.cols,
-          rows: options.rows
+          terminalId,
+          cols,
+          rows
         });
         
       } catch (error) {
@@ -168,6 +203,37 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
       }
     });
 
+    // Handle terminal close
+    socket.on('terminal:close' as any, async (input: any) => {
+      try {
+        const { terminalId } = input;
+        if (!terminalId) {
+          throw new ValidationError('Terminal ID is required');
+        }
+        
+        const fullTerminalId = `${userId}-${terminalId}`;
+        
+        logger.info('Closing terminal', {
+          socketId: socket.id,
+          terminalId,
+          userId
+        });
+        
+        // Destroy the terminal
+        await terminalManager.destroyTerminal(socket.id, true);
+        
+        // Remove from mapping
+        terminalSocketMap.delete(fullTerminalId);
+        
+      } catch (error) {
+        logger.error('Failed to close terminal', {
+          socketId: socket.id,
+          userId,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    });
+    
     // Handle file reading
     socket.on('file:read' as any, async (filePath: string) => {
       try {
@@ -215,6 +281,13 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
       try {
         // Use disconnectTerminal instead of destroyTerminal to keep session alive
         await terminalManager.disconnectTerminal(socket.id);
+        
+        // Clean up terminal mappings for this user
+        terminalSocketMap.forEach((sockId, fullTerminalId) => {
+          if (sockId === socket.id && fullTerminalId.startsWith(userId)) {
+            terminalSocketMap.delete(fullTerminalId);
+          }
+        });
       } catch (error) {
         logger.error('Failed to cleanup terminal on disconnect', {
           socketId: socket.id,

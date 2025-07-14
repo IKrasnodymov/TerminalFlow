@@ -6,7 +6,7 @@ import { logger } from '../utils/logger';
 
 export class TerminalManager {
   private terminals = new Map<string, TerminalSession>();
-  private sessionsByUserId = new Map<string, string>(); // userId -> sessionId mapping
+  private sessionsByUserId = new Map<string, Map<string, string>>(); // userId -> Map<terminalId, sessionId>
   private readonly cleanupInterval: NodeJS.Timeout;
   private readonly SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
@@ -23,28 +23,39 @@ export class TerminalManager {
 
   async createOrReuseTerminal(
     socketId: string, 
-    userId: string, 
+    userId: string,
+    clientTerminalId: string,
     sessionId?: string,
     options: Partial<TerminalOptions> = {}
   ): Promise<{ session: TerminalSession; sessionId: string; isNew: boolean }> {
     try {
-      // Check if user has an existing session
-      const existingSessionId = sessionId || this.sessionsByUserId.get(userId);
+      // Get user's terminal sessions map
+      let userSessions = this.sessionsByUserId.get(userId);
+      if (!userSessions) {
+        userSessions = new Map<string, string>();
+        this.sessionsByUserId.set(userId, userSessions);
+      }
+      
+      // Check if user has an existing session for this terminalId
+      const existingSessionId = sessionId || userSessions.get(clientTerminalId);
       
       if (existingSessionId) {
         // Try to find existing terminal session
-        for (const [terminalId, session] of this.terminals.entries()) {
-          if ((session as any).sessionId === existingSessionId && session.userId === userId) {
+        for (const [terminalKey, session] of this.terminals.entries()) {
+          if ((session as any).sessionId === existingSessionId && 
+              session.userId === userId &&
+              (session as any).clientTerminalId === clientTerminalId) {
             // Found existing session, update socket ID
             logger.info('Reusing existing terminal session', {
               sessionId: existingSessionId,
-              oldSocketId: terminalId,
+              clientTerminalId,
+              oldSocketId: terminalKey,
               newSocketId: socketId,
               userId
             });
             
             // Move session to new socket ID
-            this.terminals.delete(terminalId);
+            this.terminals.delete(terminalKey);
             (session as any).socketId = socketId;
             session.lastActivity = new Date();
             this.terminals.set(socketId, session);
@@ -61,11 +72,12 @@ export class TerminalManager {
       }
       
       // No existing session found, create new one
-      return await this.createTerminal(socketId, userId, options);
+      return await this.createTerminal(socketId, userId, clientTerminalId, options);
     } catch (error) {
       logger.error('Failed to create or reuse terminal', {
         socketId,
         userId,
+        clientTerminalId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
@@ -74,7 +86,8 @@ export class TerminalManager {
 
   async createTerminal(
     socketId: string, 
-    userId: string, 
+    userId: string,
+    clientTerminalId: string,
     options: Partial<TerminalOptions> = {}
   ): Promise<{ session: TerminalSession; sessionId: string; isNew: boolean }> {
     try {
@@ -123,12 +136,20 @@ export class TerminalManager {
         lastActivity: new Date()
       };
       
-      // Add session ID to the session object
+      // Add session ID and terminal ID to the session object
       (session as any).sessionId = sessionId;
       (session as any).socketId = socketId;
+      (session as any).clientTerminalId = clientTerminalId;
 
       this.terminals.set(socketId, session);
-      this.sessionsByUserId.set(userId, sessionId);
+      
+      // Update user sessions map
+      let userSessions = this.sessionsByUserId.get(userId);
+      if (!userSessions) {
+        userSessions = new Map<string, string>();
+        this.sessionsByUserId.set(userId, userSessions);
+      }
+      userSessions.set(clientTerminalId, sessionId);
 
       logger.info('Terminal created successfully', {
         socketId,
@@ -201,10 +222,17 @@ export class TerminalManager {
       // Remove from maps
       this.terminals.delete(socketId);
       
-      // Remove user session mapping if this was the active session
+      // Remove user session mapping
       const sessionId = (session as any).sessionId;
-      if (sessionId && this.sessionsByUserId.get(session.userId) === sessionId) {
-        this.sessionsByUserId.delete(session.userId);
+      const clientTerminalId = (session as any).clientTerminalId;
+      if (sessionId && clientTerminalId) {
+        const userSessions = this.sessionsByUserId.get(session.userId);
+        if (userSessions) {
+          userSessions.delete(clientTerminalId);
+          if (userSessions.size === 0) {
+            this.sessionsByUserId.delete(session.userId);
+          }
+        }
       }
 
       logger.info('Terminal destroyed successfully', {
