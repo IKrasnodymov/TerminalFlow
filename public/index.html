@@ -2,51 +2,119 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Web Terminal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Terminal Web - Authentication</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <link rel="stylesheet" href="style.css" />
 </head>
-<body>
-    <!-- Toast Container -->
-    <div id="toast-container" class="toast-container" role="region" aria-live="polite" aria-label="Уведомления"></div>
-    <a href="#main-content" class="skip-link">Skip to main content</a>
-    <div class="container" role="main" id="main-content">
-        <div id="auth-container" class="auth-form" role="region" aria-labelledby="auth-heading">
-            <div class="auth-header">
-                <button id="theme-toggle" class="theme-toggle" aria-label="Переключить тему" title="Переключить тему">
-                    <svg class="theme-icon sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="theme-icon moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
-                <h1 id="auth-heading">🖥️ Web Terminal</h1>
+<body class="auth-page">
+    <div class="auth-container">
+        <!-- Header -->
+        <header class="auth-header">
+            <div class="auth-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M7 10l3 3-3 3M12 17h5" stroke="#0e0e0e" stroke-width="2"/>
+                </svg>
+                <h1>Terminal Web</h1>
             </div>
-            <div id="code-request-form" role="form" aria-labelledby="request-form-desc">
-                <p id="request-form-desc">Для доступа к терминалу нажмите кнопку ниже.<br>Код доступа будет отправлен на ваш email.</p>
-                <button id="request-code-btn" class="primary-btn" aria-label="Запросить код доступа по электронной почте">📧 Запросить код доступа</button>
-                <div id="email-info" class="email-info" style="display: none;" role="status" aria-live="polite"></div>
+            <div class="connection-status">
+                <span class="status-dot"></span>
+                <span>Ready</span>
             </div>
-            <div id="code-input-form" style="display: none;" role="form" aria-labelledby="code-form-desc">
-                <p id="code-form-desc">Введите 6-значный код из email:</p>
-                <label for="access-code" class="sr-only">Код доступа</label>
-                <input type="text" id="access-code" placeholder="000000" maxlength="6" pattern="[0-9]{6}" aria-label="6-значный код доступа" aria-describedby="code-form-desc" autocomplete="one-time-code" inputmode="numeric" />
-                <button id="verify-code-btn" class="primary-btn" aria-label="Войти с кодом доступа">🔐 Войти</button>
-                <button id="request-new-code-btn" class="secondary-btn" aria-label="Запросить новый код доступа">📧 Запросить новый код</button>
+        </header>
+
+        <!-- Main Auth Card -->
+        <main class="auth-main">
+            <div class="auth-card">
+                <div class="card-header">
+                    <h2>Authentication Required</h2>
+                    <p>Secure access to terminal session</p>
+                </div>
+
+                <!-- Request Code Form -->
+                <div id="code-request-form" class="auth-form">
+                    <div class="form-section">
+                        <div class="section-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <polyline points="22,6 12,13 2,6"/>
+                            </svg>
+                        </div>
+                        <div class="section-content">
+                            <h3>Request Access Code</h3>
+                            <p>Click below to receive a 6-digit access code via email.</p>
+                            <button id="request-code-btn" class="btn btn-primary">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                                Send Access Code
+                            </button>
+                            <div id="email-info" class="email-info" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Code Input Form -->
+                <div id="code-input-form" class="auth-form" style="display: none;">
+                    <div class="form-section">
+                        <div class="section-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <circle cx="12" cy="16" r="1"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                        </div>
+                        <div class="section-content">
+                            <h3>Enter Access Code</h3>
+                            <p>Enter the 6-digit code from your email:</p>
+                            <div class="code-input-group">
+                                <input type="text" 
+                                       id="access-code" 
+                                       class="code-input" 
+                                       placeholder="000000" 
+                                       maxlength="6" 
+                                       pattern="[0-9]{6}"
+                                       autocomplete="one-time-code" 
+                                       inputmode="numeric" />
+                            </div>
+                            <div class="button-group">
+                                <button id="verify-code-btn" class="btn btn-primary">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                        <circle cx="12" cy="16" r="1"/>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                    </svg>
+                                    Authenticate
+                                </button>
+                                <button id="request-new-code-btn" class="btn btn-secondary">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="23 4 23 10 17 10"/>
+                                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                                    </svg>
+                                    Request New Code
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Messages -->
+                <div id="error-msg" class="alert alert-error" style="display: none;"></div>
+                <div id="success-msg" class="alert alert-success" style="display: none;"></div>
             </div>
-            <div id="error-msg" class="error" role="alert" aria-live="assertive"></div>
-            <div id="success-msg" class="success" role="status" aria-live="polite"></div>
-        </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="auth-footer">
+            <div class="footer-info">
+                <span>Secure Terminal Access</span>
+                <span>•</span>
+                <span>v1.0.0</span>
+            </div>
+        </footer>
+    </div>
         <div id="terminal-container" style="display: none;" role="application" aria-label="Терминал">
             <nav id="mobile-controls" class="mobile-controls" role="toolbar" aria-label="Панель управления терминалом">
                 <div class="control-group" role="group" aria-label="Модификаторы">

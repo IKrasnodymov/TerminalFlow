@@ -7,7 +7,7 @@ export class ResendEmailService {
   private static instance: ResendEmailService;
 
   constructor() {
-    // Инициализируем только если есть API ключ
+    // Initialize only if API key is available
     if (process.env.RESEND_API_KEY) {
       this.resend = new Resend(process.env.RESEND_API_KEY);
     }
@@ -21,7 +21,7 @@ export class ResendEmailService {
   }
 
   async sendAccessCode(toEmail: string, accessCode: string, userAgent?: string, ip?: string): Promise<void> {
-    // Если нет Resend API ключа - используем консоль
+    // If no Resend API key - use console
     if (!this.resend) {
       logger.info('📧 ACCESS CODE FOR DEVELOPMENT', {
         toEmail,
@@ -44,8 +44,8 @@ export class ResendEmailService {
       return; // Skip email sending if no API key
     }
 
-    const currentTime = new Date().toLocaleString('ru-RU', {
-      timeZone: 'Europe/Moscow',
+    const currentTime = new Date().toLocaleString('en-US', {
+      timeZone: 'UTC',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -75,37 +75,37 @@ export class ResendEmailService {
         <div class="container">
             <div class="header">
                 <div class="logo">🖥️ Terminal Web Access</div>
-                <h2>Код доступа к терминалу</h2>
+                <h2>Terminal Access Code</h2>
             </div>
 
-            <p>Привет! Запрошен доступ к вашему терминалу через веб-интерфейс.</p>
+            <p>Hello! Access to your terminal via web interface has been requested.</p>
 
             <div class="access-code">
-                <p><strong>Ваш код доступа:</strong></p>
+                <p><strong>Your access code:</strong></p>
                 <div class="code">${accessCode}</div>
-                <p style="margin-top: 15px; color: #666; font-size: 14px;">Код действителен в течение 10 минут</p>
+                <p style="margin-top: 15px; color: #666; font-size: 14px;">Code is valid for 10 minutes</p>
             </div>
 
             <div class="info">
-                <h3>📋 Информация о подключении:</h3>
-                <p><strong>Время запроса:</strong> ${currentTime}</p>
-                <p><strong>IP адрес:</strong> ${ip || 'Неизвестно'}</p>
-                <p><strong>Браузер:</strong> ${userAgent || 'Неизвестно'}</p>
+                <h3>📋 Connection Information:</h3>
+                <p><strong>Request time:</strong> ${currentTime} UTC</p>
+                <p><strong>IP address:</strong> ${ip || 'Unknown'}</p>
+                <p><strong>Browser:</strong> ${userAgent || 'Unknown'}</p>
             </div>
 
             <div class="warning">
-                <h3>⚠️ Безопасность:</h3>
+                <h3>⚠️ Security:</h3>
                 <ul>
-                    <li>Никогда не передавайте этот код третьим лицам</li>
-                    <li>Если вы не запрашивали доступ, проигнорируйте это письмо</li>
-                    <li>Код автоматически истекает через 10 минут</li>
-                    <li>После использования код становится недействительным</li>
+                    <li>Never share this code with third parties</li>
+                    <li>If you did not request access, ignore this email</li>
+                    <li>Code automatically expires after 10 minutes</li>
+                    <li>Code becomes invalid after use</li>
                 </ul>
             </div>
 
             <div class="footer">
                 <p>Terminal-to-Web Security System</p>
-                <p>Это автоматическое сообщение, не отвечайте на него</p>
+                <p>This is an automated message, do not reply</p>
             </div>
         </div>
     </body>
@@ -119,8 +119,8 @@ export class ResendEmailService {
       
       const { data, error } = await this.resend.emails.send({
         from: 'Terminal Access <onboarding@resend.dev>', // Resend test domain
-        to: ['ikrasnodymov@googlemail.com'], // Используем ваш зарегистрированный email
-        subject: `🔐 Код доступа к терминалу - ${accessCode}`,
+        to: ['ikrasnodymov@googlemail.com'], // Using your registered email
+        subject: `🔐 Terminal Access Code - ${accessCode}`,
         html: htmlContent,
       });
 
@@ -142,7 +142,7 @@ export class ResendEmailService {
         error: error instanceof Error ? error.message : 'Unknown error',
         ip,
       });
-      throw new Error('Не удалось отправить код доступа на email');
+      throw new Error('Failed to send access code to email');
     }
   }
 
@@ -153,7 +153,7 @@ export class ResendEmailService {
     }
 
     try {
-      // Простая проверка API ключа через отправку тестового запроса
+      // Simple API key validation through test request
       const { data, error } = await this.resend.emails.send({
         from: 'test@resend.dev',
         to: ['test@example.com'],
@@ -161,7 +161,7 @@ export class ResendEmailService {
         html: '<p>Test</p>',
       });
       
-      // Даже если email не отправился, но API ответил - значит ключ валидный
+      // Even if email wasn't sent, but API responded - key is valid
       logger.info('Resend service connection verified');
       return true;
     } catch (error) {

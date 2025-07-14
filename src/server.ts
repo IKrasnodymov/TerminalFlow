@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 import { config } from './config';
 import { logger } from './utils/logger';
@@ -168,8 +169,10 @@ app.post('/auth/token', rateLimiter.middleware, asyncHandler(async (req, res) =>
     
     clearFailedAttempts(ip);
     
+    // Create persistent userId based on email to allow cross-session command access
+    const emailHash = crypto.createHash('sha256').update((validation.email || 'default').toLowerCase()).digest('hex').substring(0, 16);
     const payload: JWTPayload = {
-      userId: 'user-' + Date.now()
+      userId: 'user-' + emailHash
     };
     
     const token = jwt.sign(payload, config.jwtSecret, {

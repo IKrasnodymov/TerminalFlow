@@ -34,7 +34,7 @@ export class EmailService {
   }
 
   async sendAccessCode(toEmail: string, accessCode: string, userAgent?: string, ip?: string): Promise<void> {
-    // Временное решение для разработки - вывод кода в консоль
+    // Development solution - output code to console
     if (config.nodeEnv === 'development') {
       logger.info('📧 ACCESS CODE FOR DEVELOPMENT', {
         toEmail,
@@ -55,8 +55,8 @@ export class EmailService {
       
       return; // Skip email sending in development
     }
-    const currentTime = new Date().toLocaleString('ru-RU', {
-      timeZone: 'Europe/Moscow',
+    const currentTime = new Date().toLocaleString('en-US', {
+      timeZone: 'UTC',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -89,44 +89,44 @@ export class EmailService {
         <div class="container">
             <div class="header">
                 <div class="logo">🖥️ Terminal Web Access</div>
-                <h2>Код доступа к терминалу</h2>
+                <h2>Terminal Access Code</h2>
             </div>
 
-            <p>Привет! Запрошен доступ к вашему терминалу через веб-интерфейс.</p>
+            <p>Hello! Access to your terminal via web interface has been requested.</p>
 
             <div class="access-code">
-                <p><strong>Ваш код доступа:</strong></p>
+                <p><strong>Your access code:</strong></p>
                 <div class="code">${accessCode}</div>
-                <p style="margin-top: 15px; color: #666; font-size: 14px;">Код действителен в течение 10 минут</p>
+                <p style="margin-top: 15px; color: #666; font-size: 14px;">Code is valid for 10 minutes</p>
             </div>
 
             <div class="info">
-                <h3>📋 Информация о подключении:</h3>
+                <h3>📋 Connection Information:</h3>
                 <table>
-                    <tr><th>Время запроса:</th><td>${currentTime}</td></tr>
-                    <tr><th>IP адрес:</th><td>${ip || 'Неизвестно'}</td></tr>
-                    <tr><th>Браузер:</th><td>${userAgent || 'Неизвестно'}</td></tr>
+                    <tr><th>Request time:</th><td>${currentTime} UTC</td></tr>
+                    <tr><th>IP address:</th><td>${ip || 'Unknown'}</td></tr>
+                    <tr><th>Browser:</th><td>${userAgent || 'Unknown'}</td></tr>
                 </table>
             </div>
 
             <div class="warning">
-                <h3>⚠️ Безопасность:</h3>
+                <h3>⚠️ Security:</h3>
                 <ul>
-                    <li>Никогда не передавайте этот код третьим лицам</li>
-                    <li>Если вы не запрашивали доступ, проигнорируйте это письмо</li>
-                    <li>Код автоматически истекает через 10 минут</li>
-                    <li>После использования код становится недействительным</li>
+                    <li>Never share this code with third parties</li>
+                    <li>If you did not request access, ignore this email</li>
+                    <li>Code automatically expires after 10 minutes</li>
+                    <li>Code becomes invalid after use</li>
                 </ul>
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-                <p>Для доступа к терминалу перейдите по ссылке:</p>
-                <a href="http://localhost:${config.port}" style="display: inline-block; background: #007acc; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Открыть терминал</a>
+                <p>To access the terminal, click the link:</p>
+                <a href="http://localhost:${config.port}" style="display: inline-block; background: #007acc; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">Open Terminal</a>
             </div>
 
             <div class="footer">
                 <p>Terminal-to-Web Security System</p>
-                <p>Это автоматическое сообщение, не отвечайте на него</p>
+                <p>This is an automated message, do not reply</p>
             </div>
         </div>
     </body>
@@ -134,23 +134,23 @@ export class EmailService {
     `;
 
     const textContent = `
-🖥️ Terminal Web Access - Код доступа
+🖥️ Terminal Web Access - Access Code
 
-Привет! Запрошен доступ к вашему терминалу через веб-интерфейс.
+Hello! Access to your terminal via web interface has been requested.
 
-КОД ДОСТУПА: ${accessCode}
+ACCESS CODE: ${accessCode}
 
-Информация о подключении:
-- Время: ${currentTime}
-- IP: ${ip || 'Неизвестно'}
-- Браузер: ${userAgent || 'Неизвестно'}
+Connection Information:
+- Time: ${currentTime} UTC
+- IP: ${ip || 'Unknown'}
+- Browser: ${userAgent || 'Unknown'}
 
-⚠️ БЕЗОПАСНОСТЬ:
-- Никогда не передавайте этот код третьим лицам
-- Код действителен 10 минут
-- После использования код становится недействительным
+⚠️ SECURITY:
+- Never share this code with third parties
+- Code is valid for 10 minutes
+- Code becomes invalid after use
 
-Для доступа: http://localhost:${config.port}
+To access: http://localhost:${config.port}
 
 Terminal-to-Web Security System
     `;
@@ -161,7 +161,7 @@ Terminal-to-Web Security System
         address: config.emailUser,
       },
       to: toEmail,
-      subject: `🔐 Код доступа к терминалу - ${accessCode}`,
+      subject: `🔐 Terminal Access Code - ${accessCode}`,
       text: textContent,
       html: htmlContent,
     };
@@ -189,7 +189,7 @@ Terminal-to-Web Security System
         error: error instanceof Error ? error.message : 'Unknown error',
         ip,
       });
-      throw new Error('Не удалось отправить код доступа на email');
+      throw new Error('Failed to send access code to email');
     }
   }
 
