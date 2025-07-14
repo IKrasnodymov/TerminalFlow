@@ -27,6 +27,7 @@ export interface TerminalSession {
   userId: string;
   createdAt: Date;
   lastActivity: Date;
+  currentDirectory?: string;
 }
 
 export interface TerminalOptions {

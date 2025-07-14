@@ -146,8 +146,15 @@ export class TerminalManager {
         pty: terminal,
         userId,
         createdAt: new Date(),
-        lastActivity: new Date()
+        lastActivity: new Date(),
+        currentDirectory: cwd
       };
+      
+      // Set initial directory explicitly
+      logger.debug('Setting initial directory for terminal', {
+        terminalKey: `${userId}-${clientTerminalId}`,
+        cwd
+      });
       
       // Add session ID and terminal ID to the session object
       (session as any).sessionId = sessionId;
@@ -200,6 +207,68 @@ export class TerminalManager {
   getTerminal(socketId: string, clientTerminalId: string, userId: string): TerminalSession | undefined {
     const terminalKey = `${userId}-${clientTerminalId}`;
     return this.getTerminalByKey(terminalKey);
+  }
+  
+  async getCurrentDirectory(terminalKey: string): Promise<string> {
+    const session = this.getTerminalByKey(terminalKey);
+    if (!session) {
+      throw new ValidationError('Terminal not found');
+    }
+    
+    return new Promise((resolve, reject) => {
+      // Create a unique marker to identify our pwd response
+      const marker = `__PWD_MARKER_${Date.now()}_${Math.random().toString(36).substr(2, 9)}__`;
+      const timeout = setTimeout(() => {
+        if (dataListener && dataListener.dispose) {
+          dataListener.dispose();
+        }
+        logger.debug('Timeout getting current directory, using cached or default', { terminalKey });
+        // Fall back to cached directory or project directory
+        resolve(session.currentDirectory || getDefaultWorkingDirectory());
+      }, 1000); // Reduced timeout
+      
+      let buffer = '';
+      let dataListener: any;
+      const dataHandler = (data: string) => {
+        buffer += data;
+        
+        // Look for our marker and the path after it
+        if (buffer.includes(marker)) {
+          const afterMarker = buffer.substring(buffer.indexOf(marker) + marker.length);
+          const lines = afterMarker.split('\n');
+          
+          for (const line of lines) {
+            const trimmed = line.trim();
+            // Match absolute paths - be more specific
+            const pathMatch = trimmed.match(/^(\/[^\s\r\n]+)/);
+            if (pathMatch && pathMatch[1].length > 1) {
+              clearTimeout(timeout);
+              if (dataListener && dataListener.dispose) {
+                dataListener.dispose();
+              }
+              session.currentDirectory = pathMatch[1];
+              logger.debug('Got current directory from terminal', { 
+                terminalKey, 
+                directory: pathMatch[1] 
+              });
+              resolve(pathMatch[1]);
+              return;
+            }
+          }
+        }
+      };
+      
+      dataListener = session.pty.onData(dataHandler);
+      // Send pwd command with marker - use a simpler approach
+      session.pty.write(`echo "${marker}"; pwd\r`);
+    });
+  }
+
+  clearCurrentDirectory(terminalKey: string): void {
+    const session = this.getTerminalByKey(terminalKey);
+    if (session) {
+      session.currentDirectory = undefined;
+    }
   }
 
   async disconnectTerminal(socketId: string): Promise<void> {

@@ -65,6 +65,22 @@
       "userId": "user-1752500574595",
       "createdAt": 1752501845123,
       "updatedAt": 1752501845123
+    },
+    {
+      "id": "cmd-1752503896200-jg9kd6b1f",
+      "cmd": "cd /Users/ikrasnodymov/Documents/terminal-to-web",
+      "desc": "terminal-to-web",
+      "userId": "user-1752500574595",
+      "createdAt": 1752503896200,
+      "updatedAt": 1752503896200
+    },
+    {
+      "id": "cmd-1752503913388-jbe28vjcd",
+      "cmd": "claude",
+      "desc": "claude",
+      "userId": "user-1752500574595",
+      "createdAt": 1752503913388,
+      "updatedAt": 1752503913388
     }
   ]
 }

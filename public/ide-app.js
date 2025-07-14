@@ -7,6 +7,8 @@ class SimpleIDE {
         this.socket = null;
         this.fileTree = {};
         this.currentPath = '/';
+        this.directoryCheckBuffer = '';
+        this.lastDirectoryCheck = 0;
         
         this.init();
     }
@@ -18,6 +20,9 @@ class SimpleIDE {
             window.location.href = '/';
             return;
         }
+        
+        // Force controls panel to be visible
+        this.showControlsPanel();
         
         this.setupSocket(token);
         this.setupEventListeners();
@@ -181,6 +186,14 @@ class SimpleIDE {
             setTimeout(() => {
                 terminal.fitAddon.fit();
             }, 0);
+            
+            // Refresh file list for this terminal's directory
+            setTimeout(() => {
+                this.loadFileTree();
+            }, 100);
+            
+            // Ensure arrow key listeners are working with the active terminal
+            this.setupArrowKeyListeners();
         }
     }
     
@@ -240,6 +253,9 @@ class SimpleIDE {
             if (this.terminals.size === 0) {
                 this.createNewTerminal();
             }
+            
+            // Re-setup event listeners after connection
+            this.setupArrowKeyListeners();
         });
         
         this.socket.on('terminal:ready', (data) => {
@@ -277,6 +293,11 @@ class SimpleIDE {
             const terminal = this.terminals.get(data.terminalId);
             if (terminal) {
                 terminal.term.write(data.data);
+                
+                // Check if we need to refresh file list (on directory change)
+                if (data.terminalId === this.activeTerminalId) {
+                    this.checkForDirectoryChange(data.data);
+                }
             }
         });
         
@@ -393,6 +414,7 @@ class SimpleIDE {
         
         // Refresh files
         document.getElementById('refresh-files').addEventListener('click', () => {
+            console.log('Refreshing file tree manually');
             this.loadFileTree();
         });
         
@@ -497,7 +519,17 @@ class SimpleIDE {
             });
         }
         
-        // Arrow buttons
+        // Setup arrow key listeners
+        this.setupArrowKeyListeners();
+    }
+    
+    setupArrowKeyListeners() {
+        // Remove existing listeners first
+        document.querySelectorAll('.arrow-btn').forEach(btn => {
+            btn.replaceWith(btn.cloneNode(true));
+        });
+        
+        // Add new listeners
         document.querySelectorAll('.arrow-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const key = btn.dataset.key;
@@ -505,13 +537,26 @@ class SimpleIDE {
                     'ArrowUp': '\x1b[A',
                     'ArrowDown': '\x1b[B',
                     'ArrowRight': '\x1b[C',
-                    'ArrowLeft': '\x1b[D'
+                    'ArrowLeft': '\x1b[D',
+                    'Enter': '\r'
                 };
                 
-                if (sequences[key] && this.socket && this.socket.connected && this.activeTerminalId) {
+                if (sequences[key] && this.socket && this.socket.connected) {
+                    if (!this.activeTerminalId) {
+                        console.error('No active terminal ID available');
+                        return;
+                    }
                     this.socket.emit('terminal:data', {
                         terminalId: this.activeTerminalId,
                         data: sequences[key]
+                    });
+                } else {
+                    console.log('Arrow key click conditions not met:', {
+                        key,
+                        hasSequence: !!sequences[key],
+                        hasSocket: !!this.socket,
+                        isConnected: this.socket && this.socket.connected,
+                        activeTerminalId: this.activeTerminalId
                     });
                 }
             });
@@ -557,7 +602,10 @@ class SimpleIDE {
     
     loadFileTree() {
         if (this.socket && this.socket.connected) {
-            this.socket.emit('files:list', this.currentPath);
+            // Send the active terminal ID to get files from its current directory
+            this.socket.emit('files:list', {
+                terminalId: this.activeTerminalId
+            });
         }
     }
     
@@ -704,7 +752,10 @@ class SimpleIDE {
                 // Open file for viewing
                 const path = item.dataset.path;
                 if (this.socket && this.socket.connected) {
-                    this.socket.emit('file:read', path);
+                    this.socket.emit('file:read', {
+                        path: path,
+                        terminalId: this.activeTerminalId
+                    });
                 }
             });
         });
@@ -1097,6 +1148,68 @@ class SimpleIDE {
             // Focus on cancel button for safety
             cancelBtn.focus();
         });
+    }
+    
+    checkForDirectoryChange(data) {
+        // Add data to buffer
+        this.directoryCheckBuffer += data;
+        
+        // Check for newlines in buffer
+        const lines = this.directoryCheckBuffer.split('\n');
+        
+        // Keep last incomplete line in buffer
+        this.directoryCheckBuffer = lines[lines.length - 1];
+        
+        // Process complete lines
+        const now = Date.now();
+        if (now - this.lastDirectoryCheck > 500) { // Throttle checks
+            for (let i = 0; i < lines.length - 1; i++) {
+                const line = lines[i].trim();
+                
+                // Look for command prompts that might indicate directory change
+                // Common patterns: user@host:~/path$ or just path$
+                if (line.includes('$') || line.includes('#') || line.includes('>')) {
+                    // Check if this looks like a prompt with a path
+                    const promptMatch = line.match(/[~\/][^$#>]*[$#>]/);
+                    if (promptMatch) {
+                        // Directory might have changed, refresh file list
+                        setTimeout(() => this.loadFileTree(), 100);
+                        this.lastDirectoryCheck = now;
+                        break;
+                    }
+                }
+                
+                // Check for cd command execution (user input)
+                if (line.match(/^cd\s+/) || line === 'cd') {
+                    // cd command detected, refresh after a delay
+                    setTimeout(() => this.loadFileTree(), 500);
+                    this.lastDirectoryCheck = now;
+                    break;
+                }
+                
+                // Check for absolute path output (from pwd command)
+                if (line.match(/^\/[^\s]+$/)) {
+                    // Absolute path detected (likely from pwd), refresh file list
+                    setTimeout(() => this.loadFileTree(), 100);
+                    this.lastDirectoryCheck = now;
+                    break;
+                }
+            }
+        }
+    }
+    
+    showControlsPanel() {
+        // Force controls panel to be visible on all devices
+        const controlsPanel = document.querySelector('.mobile-controls');
+        if (controlsPanel) {
+            controlsPanel.style.display = 'flex';
+            controlsPanel.style.visibility = 'visible';
+            controlsPanel.style.opacity = '1';
+            
+            console.log('Controls panel forced to be visible');
+        } else {
+            console.log('Controls panel not found');
+        }
     }
 }
 

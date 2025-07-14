@@ -105,5 +105,6 @@ export function getDefaultShell(): string {
 }
 
 export function getDefaultWorkingDirectory(): string {
-  return process.env.HOME || os.homedir();
+  // Use the current working directory of the Node.js process (project directory)
+  return process.cwd();
 }

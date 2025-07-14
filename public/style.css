@@ -373,14 +373,37 @@ html {
     height: calc(100% - 35px);
 }
 
-/* Ensure mobile controls are properly scrollable */
-@media (max-width: 768px) {
+/* Desktop and tablet controls styling */
+@media (min-width: 769px) {
+    .mobile-controls {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        overflow-x: visible;
+        overflow-y: visible;
+        padding: var(--spacing-sm) var(--spacing-md);
+        display: flex !important;
+    }
+    
+    .control-group {
+        flex-shrink: 0;
+        display: inline-flex;
+    }
+    
+    /* Hide collapse toggle on desktop */
+    .controls-toggle {
+        display: none;
+    }
+}
+
+/* Tablet controls styling */
+@media (min-width: 481px) and (max-width: 768px) {
     .mobile-controls {
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch;
         display: flex !important;
         flex-wrap: nowrap;
+        padding: var(--spacing-sm);
     }
     
     .control-group {
@@ -389,9 +412,26 @@ html {
     }
 }
 
-/* Mobile controls */
+/* Mobile phone controls styling */
+@media (max-width: 480px) {
+    .mobile-controls {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        display: flex !important;
+        flex-wrap: nowrap;
+        padding: var(--spacing-xs);
+    }
+    
+    .control-group {
+        flex-shrink: 0;
+        display: inline-flex;
+    }
+}
+
+/* Terminal controls panel (visible on both desktop and mobile) */
 .mobile-controls {
-    display: none;
+    display: flex !important;
     background: var(--bg-tertiary);
     padding: var(--spacing-sm);
     border-bottom: 1px solid var(--border-color);
@@ -558,7 +598,7 @@ html {
 .arrow-keys {
     position: fixed;
     bottom: var(--spacing-lg);
-    right: var(--spacing-lg);
+    right: calc(var(--spacing-lg) + 120px); /* Сдвигаем еще левее на 120px */
     background: var(--bg-tertiary);
     border-radius: var(--radius-md);
     padding: var(--spacing-sm);
@@ -587,11 +627,11 @@ html {
     padding: var(--spacing-sm);
     margin: 0.1rem;
     border-radius: var(--radius-sm);
-    font-size: var(--font-size-base);
+    font-size: calc(var(--font-size-base) * 1.5); /* Увеличиваем размер текста в 1.5 раза */
     cursor: pointer;
     user-select: none;
-    width: 45px;
-    height: 45px;
+    width: 68px; /* 45px * 1.5 */
+    height: 68px; /* 45px * 1.5 */
     display: flex;
     align-items: center;
     justify-content: center;
@@ -608,6 +648,29 @@ html {
     color: white;
     border-color: var(--color-primary);
     transform: scale(0.9);
+}
+
+/* Enter button styling */
+.arrow-btn.enter-btn {
+    background: var(--color-primary);
+    color: white;
+    font-size: calc(var(--font-size-base) * 1.2);
+    font-weight: 600;
+    width: 80px; /* Прямоугольник для символа Enter */
+    height: 45px; /* Немного ниже стрелочек */
+    border-color: var(--color-primary);
+    border-radius: var(--radius-md);
+}
+
+.arrow-btn.enter-btn:hover {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+    transform: scale(1.05);
+}
+
+.arrow-btn.enter-btn:active {
+    background: var(--color-primary-active);
+    transform: scale(0.95);
 }
 
 /* Quick commands panel */
@@ -1583,6 +1646,26 @@ button.loading::after {
         height: 30px;
         min-width: 35px;
     }
+    
+    /* Arrow keys for portrait mode */
+    .arrow-keys {
+        bottom: var(--spacing-md);
+        right: calc(var(--spacing-md) + 40px); /* Сдвигаем левее на мобильных */
+        padding: var(--spacing-xs);
+    }
+    
+    .arrow-btn {
+        width: 60px; /* Немного больше для портретного режима */
+        height: 60px;
+        font-size: calc(var(--font-size-base) * 1.3);
+        padding: var(--spacing-xs);
+    }
+    
+    .arrow-btn.enter-btn {
+        width: 70px;
+        height: 40px;
+        font-size: var(--font-size-base);
+    }
 }
 
 /* Landscape phones */
@@ -1616,15 +1699,21 @@ button.loading::after {
     /* Smaller arrow keys in landscape */
     .arrow-keys {
         bottom: var(--spacing-sm);
-        right: var(--spacing-sm);
+        right: calc(var(--spacing-sm) + 30px); /* Сдвигаем левее в ландшафте */
         padding: var(--spacing-xs);
     }
     
     .arrow-btn {
-        width: 35px;
+        width: 53px; /* 35px * 1.5 */
+        height: 53px; /* 35px * 1.5 */
+        font-size: calc(var(--font-size-sm) * 1.5);
+        padding: var(--spacing-xs);
+    }
+    
+    .arrow-btn.enter-btn {
+        width: 65px; /* Пропорционально меньше для мобильных */
         height: 35px;
         font-size: var(--font-size-sm);
-        padding: var(--spacing-xs);
     }
 }
 
@@ -1754,5 +1843,21 @@ button.loading::after {
         width: 60px;
         height: 40px;
         margin-bottom: 0;
+    }
+}
+
+/* Force controls panel to be visible on all devices */
+.mobile-controls {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Ensure controls are visible on all screen sizes */
+@media screen {
+    .mobile-controls {
+        display: flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
     }
 }
