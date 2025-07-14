@@ -1,12 +1,12 @@
 // Simple IDE Application
 class SimpleIDE {
     constructor() {
-        this.term = null;
-        this.fitAddon = null;
+        this.terminals = new Map(); // Map of terminalId -> { term, fitAddon, sessionId, element }
+        this.activeTerminalId = null;
+        this.terminalCounter = 0;
         this.socket = null;
         this.fileTree = {};
         this.currentPath = '/';
-        this.sessionId = null;
         
         this.init();
     }
@@ -19,14 +19,41 @@ class SimpleIDE {
             return;
         }
         
-        this.setupTerminal();
         this.setupSocket(token);
         this.setupEventListeners();
         this.loadFileTree();
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = setTimeout(() => {
+                // Resize all terminals
+                this.terminals.forEach((terminal) => {
+                    if (terminal.fitAddon) {
+                        terminal.fitAddon.fit();
+                    }
+                });
+            }, 100);
+        });
     }
     
-    setupTerminal() {
-        this.term = new Terminal({
+    createNewTerminal() {
+        const terminalId = `terminal-${++this.terminalCounter}`;
+        
+        // Create container
+        const container = document.createElement('div');
+        container.className = 'terminal-container';
+        container.id = `container-${terminalId}`;
+        
+        const termDiv = document.createElement('div');
+        termDiv.className = 'terminal-instance';
+        termDiv.id = terminalId;
+        container.appendChild(termDiv);
+        
+        document.getElementById('terminals-wrapper').appendChild(container);
+        
+        // Create terminal
+        const term = new Terminal({
             theme: {
                 background: '#000000',
                 foreground: '#ffffff',
@@ -40,19 +67,147 @@ class SimpleIDE {
             scrollback: 10000
         });
         
-        this.fitAddon = new FitAddon.FitAddon();
-        this.term.loadAddon(this.fitAddon);
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
         
-        this.term.open(document.getElementById('terminal'));
-        this.fitAddon.fit();
+        term.open(termDiv);
+        fitAddon.fit();
         
-        // Handle resize
-        window.addEventListener('resize', () => {
-            clearTimeout(this.resizeTimeout);
-            this.resizeTimeout = setTimeout(() => {
-                this.fitAddon.fit();
-            }, 100);
+        // Store terminal info
+        this.terminals.set(terminalId, {
+            term,
+            fitAddon,
+            sessionId: null,
+            element: container,
+            tabElement: null
         });
+        
+        // Create tab
+        this.createTab(terminalId);
+        
+        // Activate this terminal
+        this.activateTerminal(terminalId);
+        
+        // Setup terminal connection
+        if (this.socket && this.socket.connected) {
+            const storedSessionId = localStorage.getItem(`terminal-session-${terminalId}`);
+            
+            this.socket.emit('terminal:create', {
+                terminalId,
+                cols: term.cols,
+                rows: term.rows,
+                sessionId: storedSessionId || undefined
+            });
+        }
+        
+        return terminalId;
+    }
+    
+    createTab(terminalId) {
+        const tabsContainer = document.getElementById('tabs-container');
+        const tab = document.createElement('div');
+        tab.className = 'tab';
+        tab.dataset.terminalId = terminalId;
+        
+        const icon = document.createElement('span');
+        icon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M7 10l3 3-3 3M12 17h5" stroke="#1e1e1e" stroke-width="2"/>
+        </svg>`;
+        
+        const title = document.createElement('span');
+        title.className = 'tab-title';
+        title.textContent = `Terminal ${this.terminalCounter}`;
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'tab-close';
+        closeBtn.innerHTML = '×';
+        closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            this.closeTerminal(terminalId);
+        };
+        
+        tab.appendChild(icon);
+        tab.appendChild(title);
+        tab.appendChild(closeBtn);
+        
+        tab.onclick = () => this.activateTerminal(terminalId);
+        
+        tabsContainer.appendChild(tab);
+        
+        const terminal = this.terminals.get(terminalId);
+        if (terminal) {
+            terminal.tabElement = tab;
+        }
+    }
+    
+    activateTerminal(terminalId) {
+        // Hide all terminals and deactivate tabs
+        this.terminals.forEach((terminal, id) => {
+            terminal.element.classList.remove('active');
+            if (terminal.tabElement) {
+                terminal.tabElement.classList.remove('active');
+            }
+        });
+        
+        // Show selected terminal and activate tab
+        const terminal = this.terminals.get(terminalId);
+        if (terminal) {
+            terminal.element.classList.add('active');
+            if (terminal.tabElement) {
+                terminal.tabElement.classList.add('active');
+            }
+            this.activeTerminalId = terminalId;
+            
+            // Focus terminal
+            terminal.term.focus();
+            
+            // Resize
+            setTimeout(() => {
+                terminal.fitAddon.fit();
+            }, 0);
+        }
+    }
+    
+    closeTerminal(terminalId) {
+        const terminal = this.terminals.get(terminalId);
+        if (!terminal) return;
+        
+        // Don't close if it's the last terminal
+        if (this.terminals.size === 1) {
+            this.showNotification('Cannot close the last terminal', 'error');
+            return;
+        }
+        
+        // Send exit command
+        if (this.socket && this.socket.connected) {
+            this.socket.emit('terminal:close', { terminalId });
+        }
+        
+        // Remove tab
+        if (terminal.tabElement) {
+            terminal.tabElement.remove();
+        }
+        
+        // Remove container
+        terminal.element.remove();
+        
+        // Dispose terminal
+        terminal.term.dispose();
+        
+        // Remove from map
+        this.terminals.delete(terminalId);
+        
+        // Clear stored session
+        localStorage.removeItem(`terminal-session-${terminalId}`);
+        
+        // Activate another terminal
+        if (this.activeTerminalId === terminalId) {
+            const firstTerminal = this.terminals.keys().next().value;
+            if (firstTerminal) {
+                this.activateTerminal(firstTerminal);
+            }
+        }
     }
     
     setupSocket(token) {
@@ -66,61 +221,74 @@ class SimpleIDE {
         this.socket.on('connect', () => {
             this.updateStatus('Connected', true);
             
-            // Check for existing session ID
-            const storedSessionId = localStorage.getItem('terminal-session-id');
-            
-            this.socket.emit('terminal:create', {
-                cols: this.term.cols,
-                rows: this.term.rows,
-                sessionId: storedSessionId || undefined
-            });
+            // Create first terminal if none exist
+            if (this.terminals.size === 0) {
+                this.createNewTerminal();
+            }
         });
         
         this.socket.on('terminal:ready', (data) => {
-            // Handle both old format (no data) and new format (with session info)
+            const terminalId = data.terminalId;
+            const terminal = this.terminals.get(terminalId);
+            if (!terminal) return;
+            
             if (data && data.sessionId) {
-                this.sessionId = data.sessionId;
-                localStorage.setItem('terminal-session-id', data.sessionId);
+                terminal.sessionId = data.sessionId;
+                localStorage.setItem(`terminal-session-${terminalId}`, data.sessionId);
                 
                 if (!data.isNew) {
                     // Session was reconnected, show a message
-                    this.term.writeln('\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n');
+                    terminal.term.writeln('\r\n\x1b[32m✓ Reconnected to existing session\x1b[0m\r\n');
                 }
             }
             
-            this.term.focus();
+            terminal.term.focus();
+            
+            // Set up data handler
+            terminal.term.onData((data) => {
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('terminal:data', { terminalId, data });
+                }
+            });
+            
+            terminal.term.onResize(({ cols, rows }) => {
+                if (this.socket && this.socket.connected) {
+                    this.socket.emit('terminal:resize', { terminalId, cols, rows });
+                }
+            });
         });
         
         this.socket.on('terminal:data', (data) => {
-            this.term.write(data);
+            const terminal = this.terminals.get(data.terminalId);
+            if (terminal) {
+                terminal.term.write(data.data);
+            }
         });
         
         this.socket.on('disconnect', () => {
             this.updateStatus('Disconnected', false);
         });
         
-        this.socket.on('terminal:exit', () => {
+        this.socket.on('terminal:exit', (data) => {
+            const terminal = this.terminals.get(data.terminalId);
+            if (!terminal) return;
+            
             // Terminal process exited, clear session ID
-            this.sessionId = null;
-            localStorage.removeItem('terminal-session-id');
-            this.term.writeln('\r\n\x1b[31mTerminal process exited.\x1b[0m');
-            this.term.writeln('\x1b[33mPress Ctrl+R to start a new session or refresh the page.\x1b[0m\r\n');
+            terminal.sessionId = null;
+            localStorage.removeItem(`terminal-session-${data.terminalId}`);
+            terminal.term.writeln('\r\n\x1b[31mTerminal process exited.\x1b[0m');
+            terminal.term.writeln('\x1b[33mClick + to create a new terminal or press Ctrl+R to restart this one.\x1b[0m\r\n');
             
             // Disable terminal input
-            this.term.options.disableStdin = true;
+            terminal.term.options.disableStdin = true;
             
-            // Update status
-            this.updateStatus('Session Ended', false);
-            
-            // Add keyboard shortcut for restart
-            const restartHandler = (e) => {
-                if (e.ctrlKey && e.key === 'r') {
-                    e.preventDefault();
-                    document.removeEventListener('keydown', restartHandler);
-                    this.restartTerminal();
+            // Update tab title
+            if (terminal.tabElement) {
+                const title = terminal.tabElement.querySelector('.tab-title');
+                if (title) {
+                    title.textContent += ' (exited)';
                 }
-            };
-            document.addEventListener('keydown', restartHandler);
+            }
         });
         
         this.socket.on('files:list', (files) => {
@@ -161,18 +329,46 @@ class SimpleIDE {
             overlay.classList.remove('open');
         });
         
-        // Logout (Exit terminal)
+        // Exit Terminal Session
+        const exitTerminalBtn = document.getElementById('exit-terminal-btn');
+        if (exitTerminalBtn) {
+            exitTerminalBtn.addEventListener('click', async () => {
+                const confirmed = await this.showConfirmDialog(
+                    'Exit Terminal',
+                    'Are you sure you want to exit the terminal session?'
+                );
+                
+                if (confirmed) {
+                    // Send exit command to terminal
+                    if (this.socket && this.socket.connected && this.activeTerminalId) {
+                        this.socket.emit('terminal:data', {
+                            terminalId: this.activeTerminalId,
+                            data: 'exit\r'
+                        });
+                    }
+                }
+            });
+        }
+        
+        // Logout
         document.getElementById('logout-btn').addEventListener('click', async () => {
             const confirmed = await this.showConfirmDialog(
-                'Exit Terminal',
-                'Are you sure you want to exit the terminal session?'
+                'Logout',
+                'Are you sure you want to logout? You will need to authenticate again.'
             );
             
             if (confirmed) {
-                // Send exit command to terminal
+                // Disconnect socket
                 if (this.socket && this.socket.connected) {
-                    this.socket.emit('terminal:data', 'exit\r');
+                    this.socket.disconnect();
                 }
+                
+                // Clear all session data
+                localStorage.removeItem('token');
+                localStorage.removeItem('terminal-session-id');
+                
+                // Redirect to login page
+                window.location.href = '/';
             }
         });
         
@@ -182,13 +378,28 @@ class SimpleIDE {
         });
         
         // Mobile terminal focus
-        const termContainer = document.querySelector('.terminal-container');
-        termContainer.addEventListener('click', () => {
-            this.term.focus();
-        });
+        const terminalsWrapper = document.getElementById('terminals-wrapper');
+        if (terminalsWrapper) {
+            terminalsWrapper.addEventListener('click', (e) => {
+                if (this.activeTerminalId) {
+                    const terminal = this.terminals.get(this.activeTerminalId);
+                    if (terminal) {
+                        terminal.term.focus();
+                    }
+                }
+            });
+        }
         
         // Setup mobile controls
         this.setupMobileControls();
+        
+        // Add terminal button
+        const addTerminalBtn = document.getElementById('add-terminal-btn');
+        if (addTerminalBtn) {
+            addTerminalBtn.addEventListener('click', () => {
+                this.createNewTerminal();
+            });
+        }
         
         // Close file viewer
         const closeBtn = document.getElementById('close-file');
@@ -238,8 +449,11 @@ class SimpleIDE {
         const clearBtn = document.getElementById('clear-btn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('terminal:data', 'clear\r');
+                if (this.socket && this.socket.connected && this.activeTerminalId) {
+                    this.socket.emit('terminal:data', {
+                        terminalId: this.activeTerminalId,
+                        data: 'clear\r'
+                    });
                 }
             });
         }
@@ -275,15 +489,18 @@ class SimpleIDE {
                     'ArrowLeft': '\x1b[D'
                 };
                 
-                if (sequences[key] && this.socket && this.socket.connected) {
-                    this.socket.emit('terminal:data', sequences[key]);
+                if (sequences[key] && this.socket && this.socket.connected && this.activeTerminalId) {
+                    this.socket.emit('terminal:data', {
+                        terminalId: this.activeTerminalId,
+                        data: sequences[key]
+                    });
                 }
             });
         });
     }
     
     sendKey(key, modifiers) {
-        if (!this.socket || !this.socket.connected) return;
+        if (!this.socket || !this.socket.connected || !this.activeTerminalId) return;
         
         let data = key;
         
@@ -298,7 +515,10 @@ class SimpleIDE {
             }
         }
         
-        this.socket.emit('terminal:data', data);
+        this.socket.emit('terminal:data', {
+            terminalId: this.activeTerminalId,
+            data
+        });
         
         // Reset modifiers after use
         ['ctrl', 'alt', 'shift'].forEach(mod => {
@@ -589,8 +809,11 @@ class SimpleIDE {
     }
     
     runCommand(cmd) {
-        if (this.socket && this.socket.connected) {
-            this.socket.emit('terminal:data', cmd + '\r');
+        if (this.socket && this.socket.connected && this.activeTerminalId) {
+            this.socket.emit('terminal:data', {
+                terminalId: this.activeTerminalId,
+                data: cmd + '\r'
+            });
         }
     }
     
@@ -769,32 +992,41 @@ class SimpleIDE {
     }
     
     // Restart terminal session
-    restartTerminal() {
+    restartTerminal(terminalId) {
+        const terminal = this.terminals.get(terminalId || this.activeTerminalId);
+        if (!terminal) return;
+        
         // Clear old session
-        this.sessionId = null;
-        localStorage.removeItem('terminal-session-id');
+        terminal.sessionId = null;
+        localStorage.removeItem(`terminal-session-${terminalId}`);
         
         // Clear terminal
-        this.term.clear();
+        terminal.term.clear();
         
         // Re-enable input
-        this.term.options.disableStdin = false;
+        terminal.term.options.disableStdin = false;
         
         // Create new terminal session
         if (this.socket && this.socket.connected) {
             this.socket.emit('terminal:create', {
-                cols: this.term.cols,
-                rows: this.term.rows
+                terminalId: terminalId || this.activeTerminalId,
+                cols: terminal.term.cols,
+                rows: terminal.term.rows
             });
         }
     }
     
     // Show notification
     showNotification(message, type = 'error') {
-        // Simple notification in terminal
-        const prefix = type === 'error' ? '\x1b[31m✗' : '\x1b[32m✓';
-        const suffix = '\x1b[0m';
-        this.term.writeln(`\r\n${prefix} ${message}${suffix}\r\n`);
+        // Simple notification in active terminal
+        if (this.activeTerminalId) {
+            const terminal = this.terminals.get(this.activeTerminalId);
+            if (terminal) {
+                const prefix = type === 'error' ? '\x1b[31m✗' : '\x1b[32m✓';
+                const suffix = '\x1b[0m';
+                terminal.term.writeln(`\r\n${prefix} ${message}${suffix}\r\n`);
+            }
+        }
     }
     
     // Custom confirmation dialog

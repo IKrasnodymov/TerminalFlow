@@ -200,31 +200,105 @@ body {
     display: flex;
     height: 35px;
     flex-shrink: 0;
+    overflow: hidden;
+}
+
+.tabs-container {
+    display: flex;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.tabs-container::-webkit-scrollbar {
+    height: 3px;
 }
 
 .tab {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 0 16px;
+    padding: 0 12px;
     background: var(--bg-secondary);
     border-right: 1px solid var(--border);
     cursor: pointer;
     font-size: 13px;
+    min-width: 120px;
+    max-width: 200px;
+    position: relative;
 }
 
 .tab.active {
     background: var(--bg-primary);
 }
 
-.terminal-container {
+.tab-title {
     flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tab-close {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 2px;
+    margin-left: 4px;
+    border-radius: 3px;
+}
+
+.tab:hover .tab-close {
+    display: flex;
+}
+
+.tab-close:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.tab-add-btn {
+    background: var(--bg-secondary);
+    border: none;
+    border-left: 1px solid var(--border);
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-add-btn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.terminals-wrapper {
+    flex: 1;
+    position: relative;
+    background: #000;
+}
+
+.terminal-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: #000;
     padding: 8px;
     overflow: hidden;
+    display: none;
 }
 
-#terminal {
+.terminal-container.active {
+    display: block;
+}
+
+.terminal-instance {
     height: 100%;
 }
 
