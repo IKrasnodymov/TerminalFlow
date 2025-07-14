@@ -77,7 +77,9 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
             });
             
             (socket as any).emit('terminal:exit', { terminalId });
-            terminalManager.destroyTerminal(socket.id, true); // Force destroy on exit
+            
+            const terminalKey = `${userId}-${terminalId}`;
+            terminalManager.destroyTerminalByKey(terminalKey, true); // Force destroy on exit
             terminalSocketMap.delete(fullTerminalId);
           });
         } else {
@@ -128,7 +130,8 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
         }
         
         const validatedData = validateTerminalData(data);
-        await terminalManager.writeToTerminal(socket.id, validatedData);
+        const terminalKey = `${userId}-${terminalId}`;
+        await terminalManager.writeToTerminalByKey(terminalKey, validatedData);
         
       } catch (error) {
         if (error instanceof ValidationError) {
@@ -158,7 +161,8 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
           throw new ValidationError('Terminal ID is required');
         }
         
-        await terminalManager.resizeTerminal(socket.id, cols, rows);
+        const terminalKey = `${userId}-${terminalId}`;
+        await terminalManager.resizeTerminalByKey(terminalKey, cols, rows);
         
         logger.debug('Terminal resized', {
           socketId: socket.id,
@@ -220,7 +224,8 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
         });
         
         // Destroy the terminal
-        await terminalManager.destroyTerminal(socket.id, true);
+        const terminalKey = `${userId}-${terminalId}`;
+        await terminalManager.destroyTerminalByKey(terminalKey, true);
         
         // Remove from mapping
         terminalSocketMap.delete(fullTerminalId);

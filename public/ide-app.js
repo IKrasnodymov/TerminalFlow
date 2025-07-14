@@ -122,9 +122,24 @@ class SimpleIDE {
         const closeBtn = document.createElement('button');
         closeBtn.className = 'tab-close';
         closeBtn.innerHTML = '×';
-        closeBtn.onclick = (e) => {
+        closeBtn.onclick = async (e) => {
             e.stopPropagation();
-            this.closeTerminal(terminalId);
+            
+            // Check if it's the last terminal
+            if (this.terminals.size === 1) {
+                this.showNotification('Cannot close the last terminal', 'error');
+                return;
+            }
+            
+            // Show confirmation dialog
+            const confirmed = await this.showConfirmDialog(
+                'Close Terminal',
+                'Are you sure you want to close this terminal? Any running processes will be terminated.'
+            );
+            
+            if (confirmed) {
+                this.closeTerminal(terminalId);
+            }
         };
         
         tab.appendChild(icon);
@@ -276,18 +291,35 @@ class SimpleIDE {
             // Terminal process exited, clear session ID
             terminal.sessionId = null;
             localStorage.removeItem(`terminal-session-${data.terminalId}`);
-            terminal.term.writeln('\r\n\x1b[31mTerminal process exited.\x1b[0m');
-            terminal.term.writeln('\x1b[33mClick + to create a new terminal or press Ctrl+R to restart this one.\x1b[0m\r\n');
             
-            // Disable terminal input
-            terminal.term.options.disableStdin = true;
-            
-            // Update tab title
-            if (terminal.tabElement) {
-                const title = terminal.tabElement.querySelector('.tab-title');
-                if (title) {
-                    title.textContent += ' (exited)';
+            // If we have more than one terminal, close this one
+            if (this.terminals.size > 1) {
+                this.closeTerminal(data.terminalId);
+            } else {
+                // If it's the last terminal, show message and disable input
+                terminal.term.writeln('\r\n\x1b[31mTerminal process exited.\x1b[0m');
+                terminal.term.writeln('\x1b[33mClick + to create a new terminal or press Ctrl+R to restart.\x1b[0m\r\n');
+                
+                // Disable terminal input
+                terminal.term.options.disableStdin = true;
+                
+                // Update tab title
+                if (terminal.tabElement) {
+                    const title = terminal.tabElement.querySelector('.tab-title');
+                    if (title) {
+                        title.textContent += ' (exited)';
+                    }
                 }
+                
+                // Add keyboard shortcut for restart
+                const restartHandler = (e) => {
+                    if (e.ctrlKey && e.key === 'r') {
+                        e.preventDefault();
+                        document.removeEventListener('keydown', restartHandler);
+                        this.restartTerminal(data.terminalId);
+                    }
+                };
+                document.addEventListener('keydown', restartHandler);
             }
         });
         
@@ -297,19 +329,6 @@ class SimpleIDE {
         
         this.socket.on('file:content', (data) => {
             this.showFileContent(data.path, data.content);
-        });
-        
-        // Terminal events
-        this.term.onData((data) => {
-            if (this.socket && this.socket.connected) {
-                this.socket.emit('terminal:data', data);
-            }
-        });
-        
-        this.term.onResize(({ cols, rows }) => {
-            if (this.socket && this.socket.connected) {
-                this.socket.emit('terminal:resize', { cols, rows });
-            }
         });
     }
     

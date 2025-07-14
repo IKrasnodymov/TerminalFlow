@@ -5,7 +5,8 @@ import { validateTerminalDimensions, ValidationError } from '../utils/validation
 import { logger } from '../utils/logger';
 
 export class TerminalManager {
-  private terminals = new Map<string, TerminalSession>();
+  private terminals = new Map<string, TerminalSession>(); // key: userId-terminalId
+  private socketTerminals = new Map<string, Set<string>>(); // socketId -> Set of terminal keys
   private sessionsByUserId = new Map<string, Map<string, string>>(); // userId -> Map<terminalId, sessionId>
   private readonly cleanupInterval: NodeJS.Timeout;
   private readonly SESSION_TIMEOUT = 10 * 60 * 1000; // 10 minutes
@@ -54,11 +55,25 @@ export class TerminalManager {
               userId
             });
             
-            // Move session to new socket ID
-            this.terminals.delete(terminalKey);
+            // Update socket mapping
+            const oldSocketId = (session as any).socketId;
+            if (oldSocketId && this.socketTerminals.has(oldSocketId)) {
+              const socketKeys = this.socketTerminals.get(oldSocketId)!;
+              socketKeys.delete(terminalKey);
+              if (socketKeys.size === 0) {
+                this.socketTerminals.delete(oldSocketId);
+              }
+            }
+            
+            // Update session with new socket
             (session as any).socketId = socketId;
             session.lastActivity = new Date();
-            this.terminals.set(socketId, session);
+            
+            // Add to new socket mapping
+            if (!this.socketTerminals.has(socketId)) {
+              this.socketTerminals.set(socketId, new Set());
+            }
+            this.socketTerminals.get(socketId)!.add(terminalKey);
             
             // Resize if needed
             if (options.cols && options.rows) {
@@ -97,10 +112,8 @@ export class TerminalManager {
         options.rows || 24
       );
 
-      // Check if terminal already exists for this socket
-      if (this.terminals.has(socketId)) {
-        throw new ValidationError('Terminal already exists for this socket');
-      }
+      // Generate terminal key
+      const terminalKey = `${userId}-${clientTerminalId}`;
 
       // Create safe environment
       const safeEnv = createSafeEnvironment();
@@ -141,7 +154,14 @@ export class TerminalManager {
       (session as any).socketId = socketId;
       (session as any).clientTerminalId = clientTerminalId;
 
-      this.terminals.set(socketId, session);
+      // Store terminal with unique key
+      this.terminals.set(terminalKey, session);
+      
+      // Update socket mapping
+      if (!this.socketTerminals.has(socketId)) {
+        this.socketTerminals.set(socketId, new Set());
+      }
+      this.socketTerminals.get(socketId)!.add(terminalKey);
       
       // Update user sessions map
       let userSessions = this.sessionsByUserId.get(userId);
@@ -169,47 +189,67 @@ export class TerminalManager {
     }
   }
 
-  getTerminal(socketId: string): TerminalSession | undefined {
-    const session = this.terminals.get(socketId);
+  getTerminalByKey(terminalKey: string): TerminalSession | undefined {
+    const session = this.terminals.get(terminalKey);
     if (session) {
       session.lastActivity = new Date();
     }
     return session;
   }
+  
+  getTerminal(socketId: string, clientTerminalId: string, userId: string): TerminalSession | undefined {
+    const terminalKey = `${userId}-${clientTerminalId}`;
+    return this.getTerminalByKey(terminalKey);
+  }
 
   async disconnectTerminal(socketId: string): Promise<void> {
-    const session = this.terminals.get(socketId);
-    if (!session) {
+    // Get all terminals for this socket
+    const terminalKeys = this.socketTerminals.get(socketId);
+    if (!terminalKeys) {
       return;
     }
 
-    // Mark as disconnected but don't destroy immediately
-    logger.info('Disconnecting terminal (keeping alive for reconnection)', {
-      socketId,
-      sessionId: (session as any).sessionId,
-      userId: session.userId
-    });
+    // Mark all terminals as disconnected but don't destroy immediately
+    for (const terminalKey of terminalKeys) {
+      const session = this.terminals.get(terminalKey);
+      if (session) {
+        logger.info('Disconnecting terminal (keeping alive for reconnection)', {
+          socketId,
+          terminalKey,
+          sessionId: (session as any).sessionId,
+          userId: session.userId
+        });
 
-    // Update last activity
-    session.lastActivity = new Date();
+        // Update last activity
+        session.lastActivity = new Date();
+        
+        // Clear socket ID to mark as disconnected
+        (session as any).socketId = undefined;
+      }
+    }
     
-    // Clear socket ID to mark as disconnected
-    (session as any).socketId = undefined;
+    // Remove socket mapping
+    this.socketTerminals.delete(socketId);
   }
 
-  async destroyTerminal(socketId: string, force: boolean = false): Promise<void> {
-    const session = this.terminals.get(socketId);
+  async destroyTerminalByKey(terminalKey: string, force: boolean = false): Promise<void> {
+    const session = this.terminals.get(terminalKey);
     if (!session) {
       return;
     }
 
     // If not forcing and session has a sessionId, just disconnect
     if (!force && (session as any).sessionId) {
-      return this.disconnectTerminal(socketId);
+      const socketId = (session as any).socketId;
+      if (socketId) {
+        return this.disconnectTerminal(socketId);
+      }
     }
 
     try {
+      const socketId = (session as any).socketId;
       logger.info('Destroying terminal', {
+        terminalKey,
         socketId,
         sessionId: (session as any).sessionId,
         userId: session.userId,
@@ -219,8 +259,17 @@ export class TerminalManager {
       // Kill the PTY process
       session.pty.kill();
       
-      // Remove from maps
-      this.terminals.delete(socketId);
+      // Remove from terminals map
+      this.terminals.delete(terminalKey);
+      
+      // Remove from socket mapping
+      if (socketId && this.socketTerminals.has(socketId)) {
+        const socketKeys = this.socketTerminals.get(socketId)!;
+        socketKeys.delete(terminalKey);
+        if (socketKeys.size === 0) {
+          this.socketTerminals.delete(socketId);
+        }
+      }
       
       // Remove user session mapping
       const sessionId = (session as any).sessionId;
@@ -236,21 +285,22 @@ export class TerminalManager {
       }
 
       logger.info('Terminal destroyed successfully', {
+        terminalKey,
         socketId,
         sessionId,
         userId: session.userId
       });
     } catch (error) {
       logger.error('Failed to destroy terminal', {
-        socketId,
+        terminalKey,
         userId: session.userId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }
 
-  async resizeTerminal(socketId: string, cols: number, rows: number): Promise<void> {
-    const session = this.getTerminal(socketId);
+  async resizeTerminalByKey(terminalKey: string, cols: number, rows: number): Promise<void> {
+    const session = this.getTerminalByKey(terminalKey);
     if (!session) {
       throw new ValidationError('Terminal not found');
     }
@@ -260,14 +310,14 @@ export class TerminalManager {
     try {
       session.pty.resize(dimensions.cols, dimensions.rows);
       logger.debug('Terminal resized', {
-        socketId,
+        terminalKey,
         userId: session.userId,
         cols: dimensions.cols,
         rows: dimensions.rows
       });
     } catch (error) {
       logger.error('Failed to resize terminal', {
-        socketId,
+        terminalKey,
         userId: session.userId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -275,8 +325,8 @@ export class TerminalManager {
     }
   }
 
-  async writeToTerminal(socketId: string, data: string): Promise<void> {
-    const session = this.getTerminal(socketId);
+  async writeToTerminalByKey(terminalKey: string, data: string): Promise<void> {
+    const session = this.getTerminalByKey(terminalKey);
     if (!session) {
       throw new ValidationError('Terminal not found');
     }
@@ -285,7 +335,7 @@ export class TerminalManager {
       session.pty.write(data);
     } catch (error) {
       logger.error('Failed to write to terminal', {
-        socketId,
+        terminalKey,
         userId: session.userId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -309,8 +359,8 @@ export class TerminalManager {
   async destroyAllTerminals(): Promise<void> {
     logger.info('Destroying all terminals', { count: this.terminals.size });
     
-    const promises = Array.from(this.terminals.keys()).map(socketId => 
-      this.destroyTerminal(socketId)
+    const promises = Array.from(this.terminals.keys()).map(terminalKey => 
+      this.destroyTerminalByKey(terminalKey, true)
     );
     
     await Promise.allSettled(promises);
@@ -321,22 +371,22 @@ export class TerminalManager {
   private cleanupInactiveTerminals(): void {
     const now = new Date();
     
-    for (const [socketId, session] of this.terminals.entries()) {
+    for (const [terminalKey, session] of this.terminals.entries()) {
       const inactiveTime = now.getTime() - session.lastActivity.getTime();
       const isDisconnected = !(session as any).socketId;
       
       // Only cleanup disconnected sessions after timeout
       if (isDisconnected && inactiveTime > this.SESSION_TIMEOUT) {
         logger.info('Cleaning up inactive terminal session', {
-          socketId,
+          terminalKey,
           sessionId: (session as any).sessionId,
           userId: session.userId,
           inactiveTime: Math.floor(inactiveTime / 1000 / 60) + ' minutes'
         });
         
-        this.destroyTerminal(socketId, true).catch(error => {
+        this.destroyTerminalByKey(terminalKey, true).catch((error: unknown) => {
           logger.error('Failed to cleanup inactive terminal', {
-            socketId,
+            terminalKey,
             error: error instanceof Error ? error.message : 'Unknown error'
           });
         });
