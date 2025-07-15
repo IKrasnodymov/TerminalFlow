@@ -1,45 +1,45 @@
-# Удаленный доступ к терминалу
+# Remote Terminal Access
 
-## Способ 1: Cloudflare Tunnel (Рекомендуется)
+## Method 1: Cloudflare Tunnel (Recommended)
 
-### Установка и настройка:
+### Installation and Setup:
 
-1. **Запустите скрипт установки:**
+1. **Run the setup script:**
    ```bash
    ./setup-cloudflare.sh
    ```
 
-2. **Запустите сервер:**
+2. **Start the server:**
    ```bash
    npm run dev
    ```
 
-3. **В новом терминале запустите туннель:**
+3. **In a new terminal, run the tunnel:**
    ```bash
    cloudflared tunnel run terminal-web-[timestamp]
    ```
 
-4. **Доступ из любой точки мира:**
-   - URL будет показан в консоли
-   - Например: `https://terminal-you.trycloudflare.com`
+4. **Access from anywhere in the world:**
+   - URL will be shown in console
+   - Example: `https://terminal-you.trycloudflare.com`
 
-## Способ 2: Ngrok (Простой вариант)
+## Method 2: Ngrok (Simple Option)
 
 ```bash
-# Установка
+# Installation
 brew install ngrok
 
-# Запуск
+# Run
 ngrok http 3000
 
-# Используйте предоставленный URL
+# Use the provided URL
 ```
 
-## Способ 3: VPS + Nginx
+## Method 3: VPS + Nginx
 
-Если у вас есть VPS сервер:
+If you have a VPS server:
 
-1. **На VPS создайте файл** `/etc/nginx/sites-available/terminal`:
+1. **On VPS create file** `/etc/nginx/sites-available/terminal`:
 ```nginx
 server {
     listen 80;
@@ -67,45 +67,45 @@ server {
 }
 ```
 
-2. **Настройте проброс портов** на домашнем роутере:
-   - Внешний порт: 3000
-   - Внутренний порт: 3000
+2. **Configure port forwarding** on home router:
+   - External port: 3000
+   - Internal port: 3000
    - IP: 192.168.0.105
 
-## Безопасность при удаленном доступе
+## Security for Remote Access
 
-### Обязательно сделайте:
+### Must do:
 
-1. **Смените пароли в .env:**
+1. **Change passwords in .env:**
    ```
-   JWT_SECRET=очень-длинный-случайный-ключ
-   ACCESS_PASSWORD=сложный-пароль
+   JWT_SECRET=very-long-random-key
+   ACCESS_PASSWORD=strong-password
    ```
 
-2. **Используйте fail2ban** (для VPS):
+2. **Use fail2ban** (for VPS):
    ```bash
    sudo apt install fail2ban
    ```
 
-3. **Ограничьте доступ по IP** (если возможно):
+3. **Limit access by IP** (if possible):
    ```typescript
    const ALLOWED_IPS = ['your.work.ip', 'your.home.ip'];
    ```
 
-4. **Включите двухфакторную аутентификацию** (опционально)
+4. **Enable two-factor authentication** (optional)
 
-### Дополнительные меры защиты:
+### Additional Security Measures:
 
-- Rate limiting уже включен (5 попыток за 15 минут)
-- Используйте сложные пароли (минимум 16 символов)
-- Регулярно проверяйте логи доступа
-- Используйте VPN для дополнительной защиты
+- Rate limiting is already enabled (5 attempts per 15 minutes)
+- Use strong passwords (minimum 16 characters)
+- Regularly check access logs
+- Use VPN for additional protection
 
-## Мониторинг
+## Monitoring
 
-Для отслеживания подключений добавьте в .env:
+To track connections add to .env:
 ```
 LOG_CONNECTIONS=true
 ```
 
-Логи будут сохраняться в `logs/access.log`
+Logs will be saved in `logs/access.log`

@@ -1,125 +1,125 @@
-# Улучшения безопасности Terminal-to-Web
+# Terminal-to-Web Security Improvements
 
-## Критические исправления
+## Critical Fixes
 
-### ✅ 1. Обязательная валидация переменных окружения
-- **Проблема**: JWT_SECRET имел fallback значение
-- **Решение**: Обязательная проверка в `src/config.ts`
-- **Файлы**: `src/config.ts`
+### ✅ 1. Mandatory Environment Variable Validation
+- **Problem**: JWT_SECRET had fallback value
+- **Solution**: Mandatory validation in `src/config.ts`
+- **Files**: `src/config.ts`
 
-### ✅ 2. Безопасная среда для PTY процессов  
-- **Проблема**: Все переменные окружения передавались в терминал
-- **Решение**: Фильтрация чувствительных переменных в `src/utils/environment.ts`
-- **Файлы**: `src/utils/environment.ts`, `src/services/TerminalManager.ts`
+### ✅ 2. Secure Environment for PTY Processes  
+- **Problem**: All environment variables were passed to terminal
+- **Solution**: Filtering of sensitive variables in `src/utils/environment.ts`
+- **Files**: `src/utils/environment.ts`, `src/services/TerminalManager.ts`
 
-### ✅ 3. Валидация входных данных
-- **Проблема**: Отсутствие валидации размеров терминала и данных
-- **Решение**: Комплексная валидация в `src/utils/validation.ts`
-- **Файлы**: `src/utils/validation.ts`
+### ✅ 3. Input Data Validation
+- **Problem**: No validation of terminal dimensions and data
+- **Solution**: Comprehensive validation in `src/utils/validation.ts`
+- **Files**: `src/utils/validation.ts`
 
-### ✅ 4. Исправление XSS уязвимостей
-- **Проблема**: Пользовательский ввод не экранировался в HTML
-- **Решение**: Использование DOM методов вместо innerHTML
-- **Файлы**: `public/app.js`
+### ✅ 4. XSS Vulnerability Fixes
+- **Problem**: User input was not escaped in HTML
+- **Solution**: Using DOM methods instead of innerHTML
+- **Files**: `public/app.js`
 
-## Архитектурные улучшения
+## Architectural Improvements
 
-### ✅ 5. Менеджер терминалов
-- **Проблема**: Глобальное состояние, дублирование данных
-- **Решение**: Класс `TerminalManager` с инкапсуляцией
-- **Файлы**: `src/services/TerminalManager.ts`
+### ✅ 5. Terminal Manager
+- **Problem**: Global state, data duplication
+- **Solution**: `TerminalManager` class with encapsulation
+- **Files**: `src/services/TerminalManager.ts`
 
-### ✅ 6. Типизация Socket.IO
-- **Проблема**: Использование `any` типов
-- **Решение**: Строгая типизация в `src/types/index.ts`
-- **Файлы**: `src/types/index.ts`
+### ✅ 6. Socket.IO Type Safety
+- **Problem**: Using `any` types
+- **Solution**: Strict typing in `src/types/index.ts`
+- **Files**: `src/types/index.ts`
 
-### ✅ 7. Структурированное логирование
-- **Проблема**: console.log без структуры
-- **Решение**: Система логирования с уровнями и санитизацией
-- **Файлы**: `src/utils/logger.ts`
+### ✅ 7. Structured Logging
+- **Problem**: console.log without structure
+- **Solution**: Logging system with levels and sanitization
+- **Files**: `src/utils/logger.ts`
 
-### ✅ 8. Обработка ошибок
-- **Проблема**: Отсутствие централизованной обработки
-- **Решение**: Middleware для обработки ошибок
-- **Файлы**: `src/middleware/errorHandler.ts`
+### ✅ 8. Error Handling
+- **Problem**: No centralized error handling
+- **Solution**: Middleware for error processing
+- **Files**: `src/middleware/errorHandler.ts`
 
-## Улучшения безопасности
+## Security Enhancements
 
 ### ✅ 9. Rate Limiting
-- **Проблема**: In-memory хранение без очистки
-- **Решение**: Класс с автоматической очисткой и статистикой
-- **Файлы**: `src/utils/security.ts`
+- **Problem**: In-memory storage without cleanup
+- **Solution**: Class with automatic cleanup and statistics
+- **Files**: `src/utils/security.ts`
 
 ### ✅ 10. Graceful Shutdown
-- **Проблема**: Некорректное завершение процессов
-- **Решение**: Обработка сигналов с очисткой ресурсов
-- **Файлы**: `src/server.ts`
+- **Problem**: Incorrect process termination
+- **Solution**: Signal handling with resource cleanup
+- **Files**: `src/server.ts`
 
-## Качество кода
+## Code Quality
 
-### ✅ 11. ESLint и Prettier
-- **Проблема**: Отсутствие стандартов кода
-- **Решение**: Настройка линтеров и форматирования
-- **Файлы**: `.eslintrc.js`, `.prettierrc`
+### ✅ 11. ESLint and Prettier
+- **Problem**: No code standards
+- **Solution**: Linter and formatter configuration
+- **Files**: `.eslintrc.js`, `.prettierrc`
 
-### ✅ 12. Улучшенная конфигурация
-- **Проблема**: Хардкод значений
-- **Решение**: Централизованная конфигурация с валидацией
-- **Файлы**: `src/config.ts`, `.env`
+### ✅ 12. Improved Configuration
+- **Problem**: Hardcoded values
+- **Solution**: Centralized configuration with validation
+- **Files**: `src/config.ts`, `.env`
 
-## Итоговые метрики
+## Final Metrics
 
-| Категория | До | После | Улучшение |
-|-----------|-------|--------|-----------|
-| **Безопасность** | 4/10 | 9/10 | +125% |
-| **Архитектура** | 6/10 | 9/10 | +50% |
-| **Качество кода** | 5/10 | 8/10 | +60% |
-| **Типизация** | 3/10 | 9/10 | +200% |
-| **Общая оценка** | 5.5/10 | 8.5/10 | +55% |
+| Category | Before | After | Improvement |
+|----------|--------|-------|-------------|
+| **Security** | 4/10 | 9/10 | +125% |
+| **Architecture** | 6/10 | 9/10 | +50% |
+| **Code Quality** | 5/10 | 8/10 | +60% |
+| **Type Safety** | 3/10 | 9/10 | +200% |
+| **Overall Score** | 5.5/10 | 8.5/10 | +55% |
 
-## Команды для разработки
+## Development Commands
 
 ```bash
-# Разработка
+# Development
 npm run dev
 
-# Проверка типов
+# Type checking
 npm run typecheck
 
-# Линтинг
+# Linting
 npm run lint
 npm run lint:fix
 
-# Форматирование
+# Formatting
 npm run format
 
-# Сборка
+# Build
 npm run build
 
-# Продакшн
+# Production
 npm start
 ```
 
-## Безопасность для продакшна
+## Production Security
 
-1. **Обязательно измените**:
-   - `JWT_SECRET` (минимум 32 символа)
-   - `ACCESS_PASSWORD` (минимум 8 символов)
+1. **Must change**:
+   - `JWT_SECRET` (minimum 32 characters)
+   - `ACCESS_PASSWORD` (minimum 8 characters)
 
-2. **Настройте CORS**:
+2. **Configure CORS**:
    ```env
    CORS_ORIGIN=https://yourdomain.com
    ```
 
-3. **Включите HTTPS**:
-   - Используйте reverse proxy (nginx)
-   - Настройте SSL сертификаты
+3. **Enable HTTPS**:
+   - Use reverse proxy (nginx)
+   - Configure SSL certificates
 
-4. **Мониторинг**:
+4. **Monitoring**:
    ```bash
-   # Статистика rate limiting
+   # Rate limiting statistics
    curl -H "X-Admin-Token: YOUR_JWT_SECRET" http://localhost:3000/admin/stats
    ```
 
-Проект теперь готов для безопасного использования в продакшне!
+The project is now ready for secure production use!
