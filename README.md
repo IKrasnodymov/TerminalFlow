@@ -1,6 +1,6 @@
-# Terminal to Web 🖥️
+# TerminalFlow 🖥️
 
-Веб-терминал для удаленного управления macOS терминалом с любого устройства через браузер. Современная архитектура с email-аутентификацией и мобильной поддержкой.
+A modern web-based terminal emulator that enables remote control of your macOS terminal from any device through a web browser. Features secure email-based two-factor authentication and mobile optimization.
 
 ![Terminal Demo](https://img.shields.io/badge/Platform-macOS-blue) ![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
 

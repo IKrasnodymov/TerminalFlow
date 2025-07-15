@@ -27,7 +27,7 @@ function updateConnectionStatus(status, text) {
     connectionText.textContent = text;
     
     // Announce to screen readers
-    announceToScreenReader('Статус подключения: ' + text, status === 'disconnected' ? 'assertive' : 'polite');
+    announceToScreenReader('Connection status: ' + text, status === 'disconnected' ? 'assertive' : 'polite');
 }
 
 // Theme management
@@ -55,7 +55,7 @@ function initTheme() {
                 };
             }
             
-            announceToScreenReader('Тема изменена на ' + (newTheme === 'dark' ? 'тёмную' : 'светлую'));
+            announceToScreenReader('Theme changed to ' + (newTheme === 'dark' ? 'dark' : 'light'));
         });
     }
 }
@@ -71,21 +71,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Validate token first (async)
         isTokenValid(storedToken).then(valid => {
             if (valid) {
-                // Token is valid, connect to terminal automatically
-                const successMsg = document.getElementById('success-msg');
-                if (successMsg) {
-                    successMsg.textContent = 'Восстановление сессии...';
-                    successMsg.style.display = 'block';
-                }
-                setTimeout(() => {
-                    connectToTerminal(storedToken);
-                }, 100);
+                // Token is valid, redirect to terminal page
+                window.location.href = '/terminal.html';
+                return;
             } else {
                 // Token is invalid/expired, remove it
                 localStorage.removeItem('token');
                 const errorMsg = document.getElementById('error-msg');
                 if (errorMsg) {
-                    errorMsg.textContent = 'Сессия истекла. Требуется новая аутентификация.';
+                    errorMsg.textContent = 'Session expired. New authentication required.';
                     errorMsg.style.display = 'block';
                 }
             }
@@ -94,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
             localStorage.removeItem('token');
             const errorMsg = document.getElementById('error-msg');
             if (errorMsg) {
-                errorMsg.textContent = 'Ошибка проверки сессии. Требуется новая аутентификация.';
+                errorMsg.textContent = 'Session validation error. New authentication required.';
                 errorMsg.style.display = 'block';
             }
         });
@@ -140,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function requestAccessCode() {
     requestCodeBtn.disabled = true;
-    requestCodeBtn.textContent = 'Отправляем...';
+    requestCodeBtn.textContent = 'Sending...';
     clearMessages();
 
     try {
@@ -154,11 +148,11 @@ async function requestAccessCode() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || 'Не удалось запросить код');
+            throw new Error(data.error || 'Failed to request code');
         }
 
-        showSuccess('Код отправлен на ваш email!');
-        emailInfo.innerHTML = '<strong>📧 Код отправлен на:</strong> ' + data.email;
+        showSuccess('Code sent to your email!');
+        emailInfo.innerHTML = '<strong>📧 Code sent to:</strong> ' + data.email;
         emailInfo.style.display = 'block';
         
         // Переключаемся на форму ввода кода
@@ -170,14 +164,14 @@ async function requestAccessCode() {
             codeInputForm.classList.add('fade-in');
             accessCodeInput.value = '';
             accessCodeInput.focus();
-            announceToScreenReader('Форма ввода кода активна. Введите 6-значный код.');
+            announceToScreenReader('Code input form active. Enter 6-digit code.');
         }, 200);
 
     } catch (error) {
         showError(error.message);
     } finally {
         requestCodeBtn.disabled = false;
-        requestCodeBtn.textContent = '📧 Запросить код доступа';
+        requestCodeBtn.textContent = '📧 Request Access Code';
     }
 }
 
@@ -185,12 +179,12 @@ async function verifyAccessCode() {
     const accessCode = accessCodeInput.value.trim();
     
     if (!accessCode || accessCode.length !== 6) {
-        showError('Введите 6-значный код из email');
+        showError('Enter 6-digit code from email');
         return;
     }
 
     verifyCodeBtn.disabled = true;
-    verifyCodeBtn.textContent = 'Проверяем...';
+    verifyCodeBtn.textContent = 'Verifying...';
     clearMessages();
 
     try {
@@ -205,11 +199,11 @@ async function verifyAccessCode() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || 'Неверный код доступа');
+            throw new Error(data.error || 'Invalid access code');
         }
 
         localStorage.setItem('token', data.token);
-        showSuccess('Код принят! Переходим в терминал...');
+        showSuccess('Code accepted! Redirecting to terminal...');
         
         setTimeout(() => {
             window.location.href = '/terminal.html';
@@ -218,7 +212,7 @@ async function verifyAccessCode() {
     } catch (error) {
         showError(error.message);
         verifyCodeBtn.disabled = false;
-        verifyCodeBtn.textContent = '🔐 Войти';
+        verifyCodeBtn.textContent = '🔐 Sign In';
     }
 }
 
@@ -253,30 +247,9 @@ function clearMessages() {
 }
 
 function connectToTerminal(token) {
-    // Get DOM elements directly to avoid scope issues
-    const authContainer = document.getElementById('auth-container');
-    const terminalContainer = document.getElementById('terminal-container');
-    
-    if (!authContainer || !terminalContainer) {
-        console.error('Required DOM elements not found');
-        return;
-    }
-    
-    // Smooth transition from auth to terminal
-    authContainer.classList.add('fade-out');
-    
-    setTimeout(function() {
-        authContainer.style.display = 'none';
-        terminalContainer.style.display = 'block';
-        terminalContainer.classList.add('fade-in');
-        document.body.classList.add('terminal-active');
-        
-        // Announce terminal activation
-        announceToScreenReader('Терминал активирован. Подключение к серверу...');
-        
-        // Continue with terminal initialization
-        initializeTerminalWithToken(token);
-    }, 300);
+    // Store token and redirect to terminal page
+    localStorage.setItem('token', token);
+    window.location.href = '/terminal.html';
 }
 
 function initializeTerminalWithToken(token) {
@@ -641,18 +614,18 @@ function disconnectSession() {
         localStorage.removeItem('token');
         
         // Show disconnect message
-        showToast('Сессия завершена', 'info');
+        showToast('Session ended', 'info');
         
         // Redirect to auth page after a short delay
         setTimeout(() => {
             window.location.reload();
         }, 1000);
         
-        announceToScreenReader('Сессия завершена. Возврат к аутентификации.');
+        announceToScreenReader('Session ended. Returning to authentication.');
         
     } catch (error) {
         console.error('Error disconnecting session:', error);
-        showToast('Ошибка при отключении сессии', 'error');
+        showToast('Error disconnecting session', 'error');
     }
 }
 
@@ -663,7 +636,7 @@ function checkTokenExpiration() {
     
     // Use client-side validation for periodic checks (faster)
     if (!isTokenValidClientSide(token)) {
-        showToast('Сессия истекла', 'error');
+        showToast('Session expired', 'error');
         disconnectSession();
         return;
     }
@@ -678,10 +651,10 @@ function checkTokenExpiration() {
             
             // If token expires in less than 5 minutes, show warning
             if (expiryTime - currentTime < 5 * 60 * 1000 && expiryTime > currentTime) {
-                showToast('Сессия истекает через 5 минут', 'warning', {
+                showToast('Session expires in 5 minutes', 'warning', {
                     duration: 10000,
                     action: () => window.location.reload(),
-                    actionText: 'Обновить'
+                    actionText: 'Refresh'
                 });
             }
         }
@@ -793,7 +766,7 @@ function showToast(message, type = 'info', options = {}) {
     const closeBtn = document.createElement('button');
     closeBtn.className = 'toast-close';
     closeBtn.innerHTML = '×';
-    closeBtn.setAttribute('aria-label', 'Закрыть уведомление');
+    closeBtn.setAttribute('aria-label', 'Close notification');
     closeBtn.addEventListener('click', function() {
         removeToast(id);
     });
@@ -885,7 +858,7 @@ function setupMobileControls() {
             var commandBtn = document.createElement('button');
             commandBtn.className = 'command-btn';
             commandBtn.setAttribute('data-command', cmd.command);
-            commandBtn.setAttribute('aria-label', 'Выполнить команду: ' + (cmd.name || cmd.command));
+            commandBtn.setAttribute('aria-label', 'Execute command: ' + (cmd.name || cmd.command));
             
             if (cmd.name) {
                 var nameSpan = document.createElement('span');
@@ -900,7 +873,7 @@ function setupMobileControls() {
             var deleteBtn = document.createElement('button');
             deleteBtn.className = 'delete-command-btn';
             deleteBtn.setAttribute('data-id', cmd.id.toString());
-            deleteBtn.setAttribute('aria-label', 'Удалить команду: ' + (cmd.name || cmd.command));
+            deleteBtn.setAttribute('aria-label', 'Delete command: ' + (cmd.name || cmd.command));
             deleteBtn.textContent = '×';
             
             commandItem.appendChild(commandBtn);
@@ -927,7 +900,7 @@ function setupMobileControls() {
                 var id = parseInt(this.getAttribute('data-id'));
                 quickCommands.deleteCommand(id);
                 renderCommandsList();
-                announceToScreenReader('Команда удалена');
+                announceToScreenReader('Command deleted');
             });
         }
     }
@@ -1032,7 +1005,7 @@ function setupMobileControls() {
             const isVisible = settingsPanel.style.display !== 'none';
             settingsPanel.style.display = isVisible ? 'none' : 'block';
             settingsBtn.setAttribute('aria-expanded', isVisible ? 'false' : 'true');
-            announceToScreenReader('Настройки ' + (isVisible ? 'скрыты' : 'открыты'));
+            announceToScreenReader('Settings ' + (isVisible ? 'hidden' : 'opened'));
             
             if (!isVisible) {
                 setupSettingsPanel();
@@ -1115,7 +1088,7 @@ function setupSettingsPanel() {
         soundEnabledCheckbox.addEventListener('change', function() {
             terminalSettings.soundEnabled = this.checked;
             saveSettings();
-            announceToScreenReader('Звуковые уведомления ' + (this.checked ? 'включены' : 'выключены'));
+            announceToScreenReader('Sound notifications ' + (this.checked ? 'enabled' : 'disabled'));
         });
     }
     
@@ -1131,7 +1104,7 @@ function setupSettingsPanel() {
             terminalSettings.colorScheme = this.dataset.scheme;
             applyTerminalSettings();
             saveSettings();
-            announceToScreenReader('Цветовая схема изменена');
+            announceToScreenReader('Color scheme changed');
         });
     });
     
@@ -1146,7 +1119,7 @@ function setupSettingsPanel() {
             saveSettings();
             applyTerminalSettings();
             setupSettingsPanel(); // Refresh UI
-            announceToScreenReader('Настройки сброшены');
+            announceToScreenReader('Settings reset');
         });
     }
     
@@ -1155,7 +1128,7 @@ function setupSettingsPanel() {
     if (disconnectSessionBtn) {
         disconnectSessionBtn.addEventListener('click', function() {
             // Confirm disconnect
-            if (confirm('Вы уверены, что хотите завершить сессию?')) {
+            if (confirm('Are you sure you want to end the session?')) {
                 disconnectSession();
             }
         });
@@ -1169,7 +1142,7 @@ function setupSettingsPanel() {
             if (settingsBtn) {
                 settingsBtn.setAttribute('aria-expanded', 'false');
             }
-            announceToScreenReader('Настройки закрыты');
+            announceToScreenReader('Settings closed');
         });
     }
 
@@ -1188,7 +1161,7 @@ function setupSettingsPanel() {
             commandInput.value = '';
             commandName.value = '';
             commandInput.focus();
-            announceToScreenReader('Форма добавления команды открыта');
+            announceToScreenReader('Add command form opened');
         });
     }
 
@@ -1213,9 +1186,9 @@ function setupSettingsPanel() {
                 commandInput.value = '';
                 commandName.value = '';
                 renderCommandsList();
-                announceToScreenReader('Команда "' + (name || command) + '" добавлена');
+                announceToScreenReader('Command "' + (name || command) + '" added');
             } else {
-                announceToScreenReader('Введите команду', 'assertive');
+                announceToScreenReader('Enter command', 'assertive');
                 commandInput.focus();
             }
         });

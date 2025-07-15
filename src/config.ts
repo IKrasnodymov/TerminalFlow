@@ -50,7 +50,10 @@ export const config = {
   
   // Access code configuration
   accessCodeExpiryMinutes: parseInt(getOptionalEnv('ACCESS_CODE_EXPIRY_MINUTES', '10'), 10),
-  strictIpValidation: getOptionalEnv('STRICT_IP_VALIDATION', 'false') === 'true'
+  strictIpValidation: getOptionalEnv('STRICT_IP_VALIDATION', 'false') === 'true',
+  
+  // Groq API configuration
+  groqApiKey: process.env.GROQ_API_KEY
 };
 
 // Validate configuration

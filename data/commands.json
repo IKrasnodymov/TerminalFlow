@@ -82,5 +82,137 @@
       "createdAt": 1752503913388,
       "updatedAt": 1752503913388
     }
+  ],
+  "user-1752507176715": [
+    {
+      "id": "user-1752507176715-1",
+      "cmd": "ls -la",
+      "desc": "List all files",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "user-1752507176715-2",
+      "cmd": "pwd",
+      "desc": "Current directory",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "user-1752507176715-3",
+      "cmd": "git status",
+      "desc": "Git status",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "user-1752507176715-4",
+      "cmd": "git log --oneline -10",
+      "desc": "Recent commits",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "user-1752507176715-5",
+      "cmd": "npm run dev",
+      "desc": "Start dev server",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "user-1752507176715-6",
+      "cmd": "npm test",
+      "desc": "Run tests",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "user-1752507176715-7",
+      "cmd": "clear",
+      "desc": "Clear terminal",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507201092,
+      "updatedAt": 1752507201092
+    },
+    {
+      "id": "cmd-1752507218488-9edjrds4p",
+      "cmd": "cd /Users/ikrasnodymov/Documents/terminal-to-web",
+      "desc": "terminal-to-web",
+      "userId": "user-1752507176715",
+      "createdAt": 1752507218488,
+      "updatedAt": 1752507218488
+    }
+  ],
+  "user-93a2fdec2f186885": [
+    {
+      "id": "user-93a2fdec2f186885-1",
+      "cmd": "ls -la",
+      "desc": "List all files",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "user-93a2fdec2f186885-2",
+      "cmd": "pwd",
+      "desc": "Current directory",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "user-93a2fdec2f186885-3",
+      "cmd": "git status",
+      "desc": "Git status",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "user-93a2fdec2f186885-4",
+      "cmd": "git log --oneline -10",
+      "desc": "Recent commits",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "user-93a2fdec2f186885-5",
+      "cmd": "npm run dev",
+      "desc": "Start dev server",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "user-93a2fdec2f186885-6",
+      "cmd": "npm test",
+      "desc": "Run tests",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "user-93a2fdec2f186885-7",
+      "cmd": "clear",
+      "desc": "Clear terminal",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752511553512,
+      "updatedAt": 1752511553512
+    },
+    {
+      "id": "cmd-1752558714227-6jfp8f58f",
+      "cmd": "claude",
+      "desc": "claude",
+      "userId": "user-93a2fdec2f186885",
+      "createdAt": 1752558714227,
+      "updatedAt": 1752558714227
+    }
   ]
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Terminal-to-Web is a web-based terminal emulator that enables remote control of a macOS terminal from any device through a web browser. The application uses email-based two-factor authentication with one-time access codes for security.
+TerminalFlow is a modern web-based terminal emulator that enables remote control of a macOS terminal from any device through a web browser. The application uses email-based two-factor authentication with one-time access codes for security.
 
 ## Architecture
 
@@ -12,8 +12,9 @@ Terminal-to-Web is a web-based terminal emulator that enables remote control of 
 - **Server Entry Point**: `src/server.ts` - Express server with Socket.IO integration and email authentication endpoints
 - **Configuration**: `src/config.ts` - Centralized configuration with environment variable validation
 - **Service Layer**: 
-  - `src/services/TerminalManager.ts` - PTY process management with node-pty
+  - `src/services/TerminalManager.ts` - PTY process management with node-pty and directory tracking
   - `src/services/AccessCodeService.ts` - Generates/validates 6-digit access codes
+  - `src/services/CommandService.ts` - Persistent command storage per user
   - `src/services/ResendEmailService.ts` - Email service using Resend API (primary)
   - `src/services/EmailService.ts` - Gmail SMTP fallback service
 - **Security Layer**:
@@ -21,11 +22,12 @@ Terminal-to-Web is a web-based terminal emulator that enables remote control of 
   - `src/utils/security.ts` - Rate limiting with IP tracking and progressive lockout
   - `src/utils/validation.ts` - Input validation and XSS protection
 
-### Frontend Architecture (Vanilla JS + ES5 Compatibility)
+### Frontend Architecture (Multiple UIs)
+- **Authentication Page** (`public/index.html`): Modern dark theme with mobile optimization
+- **IDE Interface** (`public/terminal.html`): Full IDE with file explorer, tabs, and terminal
 - **Terminal Emulation**: xterm.js with fit addon for browser-based terminal
 - **Communication**: Socket.IO client for real-time bidirectional terminal I/O
-- **Authentication UI**: Email code request and validation forms
-- **Mobile Controls**: Comprehensive touch-friendly virtual controls panel
+- **Mobile Controls**: Touch-friendly virtual controls with arrow keys and modifiers
 
 ### Email Authentication Flow
 1. User requests access code via `/auth/request-code` endpoint
@@ -126,9 +128,10 @@ ACCESS_CODE_EXPIRY_MINUTES=10
 
 ### TerminalManager (`src/services/TerminalManager.ts`)
 - Singleton pattern for shared terminal management
-- PTY process lifecycle management
+- PTY process lifecycle management with directory tracking
 - Environment variable filtering for security
 - Cross-platform shell detection
+- Real-time current directory detection using PWD markers
 
 ### Email Services
 - **Primary**: ResendEmailService with HTML email templates
@@ -158,38 +161,24 @@ cloudflared tunnel --url localhost:3000
 2. **Gmail**: Enable 2FA, create App Password for SMTP access
 3. Development mode works without email configuration (codes in console)
 
-## Using Claude Code in Web Terminal
+## User Session and Command Management
 
-The web terminal supports Claude Code CLI with optimizations for mobile and web browsers:
+### Persistent User Sessions
+- User identity based on email hash (SHA256, first 16 chars) for cross-session persistence
+- JWT tokens contain persistent `userId` allowing command access from any device
+- Commands are stored per-user in `data/commands.json` with automatic file management
 
-### Claude Code Usage
+### Command Storage Architecture (`src/services/CommandService.ts`)
+- File-based storage with in-memory Map for performance
+- Default commands automatically created for new users
+- Thread-safe operations with atomic file writes
+- Commands include: id, cmd, desc, userId, createdAt, updatedAt
 
-**Standard mode (may have UI issues):**
-```bash
-claude "write a test for app.js"
-```
-
-**Simple mode (recommended for web terminal):**
-```bash
-./claude-simple "write a test for app.js"
-./claude-simple --help
-```
-
-**Direct command mode:**
-```bash
-echo "write a test for app.js" | claude
-```
-
-### Terminal Features
-- **Mobile-optimized**: Works on phones and tablets through browser
-- **Touch controls**: Virtual keyboard support
-- **Session persistence**: 24-hour token-based authentication
-- **Real-time**: Full bidirectional terminal I/O
-
-### Known Issues
-- Complex UI elements may occasionally duplicate (filtered automatically)
-- Some escape sequences optimized for web compatibility
-- Use `Ctrl+C` if Claude Code interface becomes unresponsive
+### File System Integration (`src/terminalHandler.ts`)
+- Real-time file explorer with directory following
+- Terminal current directory detection using PWD markers
+- File read/write operations scoped to terminal session
+- Automatic directory synchronization between terminal and file explorer
 
 ## Key Implementation Details
 
@@ -210,3 +199,38 @@ echo "write a test for app.js" | claude
 - Terminal state synchronized via Socket.IO events
 - Mobile controls use event delegation for performance
 - Quick commands persist across browser sessions
+
+## Speech-to-Text Integration
+
+### Groq API Integration (`src/services/SpeechService.ts`)
+- Real-time speech transcription using Groq's Whisper models
+- Automatic language detection with ISO-639-1 code conversion
+- Model selection: `whisper-large-v3` for non-English, `whisper-large-v3-turbo` for English
+- Singleton pattern with graceful error handling and logging
+
+### Speech UI Components (`public/terminal.html`, `public/ide-app.js`)
+- **Floating Microphone Button**: Click-to-record interface positioned center-bottom
+- **Processing Overlay**: Compact, animated status display during transcription
+- **Mobile Optimization**: Touch-friendly controls with proper positioning
+- **Auto-hide Logic**: Button hidden when `GROQ_API_KEY` not configured
+
+### Speech API Endpoints (`src/server.ts`)
+- `/api/speech/status` - Check service availability and API key presence
+- `/api/speech/detect-language` - Language detection from audio buffer
+- `/api/speech/transcribe` - Audio transcription with language specification
+- `/api/speech/speech-to-text` - Combined detect + transcribe workflow
+- File upload via multer with 25MB limit, supports multiple audio formats
+
+### Speech Configuration
+```bash
+# Optional - Speech-to-Text via Groq API
+GROQ_API_KEY=gsk_your_groq_api_key_here
+```
+
+### Speech Workflow
+1. User clicks microphone button to start/stop recording
+2. Audio captured via MediaRecorder API (WebM/WAV format)
+3. Language auto-detected using Whisper model
+4. Text transcribed in original language (no translation)
+5. Transcribed text inserted directly into active terminal
+6. Visual feedback throughout process with cancel option

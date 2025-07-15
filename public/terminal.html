@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Terminal IDE</title>
+    <title>TerminalFlow IDE</title>
     <link rel="stylesheet" href="ide-style.css">
     <link rel="stylesheet" href="https://unpkg.com/xterm@5.3.0/css/xterm.css">
 </head>
@@ -16,7 +16,7 @@
                     <rect x="3" y="3" width="18" height="18" rx="2"/>
                     <path d="M7 10l3 3-3 3M12 17h5"/>
                 </svg>
-                <span>Terminal IDE</span>
+                <span>TerminalFlow</span>
             </div>
             <div class="ide-header-actions">
                 <button id="toggle-sidebar" class="ide-btn" title="Toggle Sidebar">
@@ -153,6 +153,55 @@
                 <span id="file-count">0 files</span>
             </div>
         </footer>
+    </div>
+
+    <!-- Speech-to-Text Floating Button -->
+    <div class="speech-button-container" id="speech-button-container">
+        <button class="speech-btn" id="speech-btn" title="Speech to Text">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/>
+                <path d="M19 10v2a7 7 0 01-14 0v-2"/>
+                <line x1="12" y1="19" x2="12" y2="23"/>
+                <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+            <span class="speech-status" id="speech-status">Click to record</span>
+        </button>
+        
+        <!-- Speech processing overlay -->
+        <div class="speech-processing" id="speech-processing" style="display: none;">
+            <div class="processing-content">
+                <div class="processing-spinner"></div>
+                <div class="processing-text" id="processing-text">Processing...</div>
+                <button class="processing-cancel" id="processing-cancel" title="Cancel">×</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="context-menu" style="display: none;">
+        <div class="context-menu-item" id="copy-path">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>
+            </svg>
+            Copy Path
+        </div>
+        <div class="context-menu-item" id="copy-relative-path">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            </svg>
+            Copy Relative Path
+        </div>
+        <div class="context-menu-item" id="insert-path">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                <path d="M2 2l7.586 7.586"/>
+                <circle cx="11" cy="11" r="2"/>
+            </svg>
+            Insert Path in Terminal
+        </div>
     </div>
 
     <!-- Mobile Menu Overlay -->

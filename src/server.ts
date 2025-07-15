@@ -5,6 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import multer from 'multer';
 
 import { config } from './config';
 import { logger } from './utils/logger';
@@ -17,6 +18,7 @@ import { AuthRequest, AuthResponse, HealthResponse, JWTPayload } from './types';
 import { ResendEmailService } from './services/ResendEmailService';
 import { AccessCodeService } from './services/AccessCodeService';
 import { commandService } from './services/CommandService';
+import { SpeechService } from './services/SpeechService';
 
 const app = express();
 const httpServer = createServer(app);
@@ -41,6 +43,23 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Configure multer for audio file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024, // 25MB limit (Groq free tier)
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedTypes = ['audio/wav', 'audio/mpeg', 'audio/mp4', 'audio/webm', 'audio/ogg', 'audio/flac', 'audio/m4a'];
+    if (allowedTypes.includes(file.mimetype) || file.originalname.match(/\.(wav|mp3|mp4|webm|ogg|flac|m4a)$/i)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only audio files are allowed.'));
+    }
+  }
+});
 
 // Health check endpoint
 app.get('/health', asyncHandler(async (req, res) => {
@@ -309,6 +328,169 @@ app.delete('/api/commands/:id', asyncHandler(async (req, res) => {
   }
 }));
 
+// Speech transcription endpoints
+// Check if speech service is available (public endpoint - no auth required for status check)
+app.get('/api/speech/status', asyncHandler(async (req, res) => {
+  const speechService = SpeechService.getInstance();
+  const isAvailable = await speechService.isAvailable();
+  const hasApiKey = !!config.groqApiKey;
+  
+  logger.info('Speech status check', { 
+    hasApiKey, 
+    isAvailable, 
+    ip: req.ip 
+  });
+  
+  res.json({ 
+    available: isAvailable && hasApiKey,
+    hasApiKey: hasApiKey,
+    service: hasApiKey ? 'groq' : null,
+    models: (isAvailable && hasApiKey) ? ['whisper-large-v3-turbo', 'whisper-large-v3', 'distil-whisper-large-v3-en'] : []
+  });
+}));
+
+// Language detection endpoint
+app.post('/api/speech/detect-language', upload.single('audio'), asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    jwt.verify(token, config.jwtSecret) as JWTPayload;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Audio file is required' });
+    }
+    
+    const speechService = SpeechService.getInstance();
+    if (!(await speechService.isAvailable())) {
+      return res.status(503).json({ error: 'Speech service is not available' });
+    }
+    
+    const result = await speechService.detectLanguage(req.file.buffer, req.file.originalname);
+    
+    logger.info('Language detection completed', {
+      filename: req.file.originalname,
+      detectedLanguage: result.language,
+      confidence: result.confidence
+    });
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Language detection failed', { error });
+    if (error instanceof Error && error.message.includes('Invalid file type')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Language detection failed' });
+    }
+  }
+}));
+
+// Audio transcription endpoint
+app.post('/api/speech/transcribe', upload.single('audio'), asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    jwt.verify(token, config.jwtSecret) as JWTPayload;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Audio file is required' });
+    }
+    
+    const speechService = SpeechService.getInstance();
+    if (!(await speechService.isAvailable())) {
+      return res.status(503).json({ error: 'Speech service is not available' });
+    }
+    
+    const { language } = req.body;
+    
+    const result = await speechService.transcribeAudio({
+      audioBuffer: req.file.buffer,
+      filename: req.file.originalname,
+      language: language
+    });
+    
+    logger.info('Audio transcription completed', {
+      filename: req.file.originalname,
+      language: language || 'auto',
+      textLength: result.text.length,
+      confidence: result.confidence
+    });
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Audio transcription failed', { error });
+    if (error instanceof Error && error.message.includes('Invalid file type')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Audio transcription failed' });
+    }
+  }
+}));
+
+// Combined speech-to-text endpoint (detect language + transcribe)
+app.post('/api/speech/speech-to-text', upload.single('audio'), asyncHandler(async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    jwt.verify(token, config.jwtSecret) as JWTPayload;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'Audio file is required' });
+    }
+    
+    const speechService = SpeechService.getInstance();
+    if (!(await speechService.isAvailable())) {
+      return res.status(503).json({ error: 'Speech service is not available' });
+    }
+    
+    // Step 1: Detect language
+    const languageResult = await speechService.detectLanguage(req.file.buffer, req.file.originalname);
+    
+    // Step 2: Transcribe with detected language
+    const transcriptionResult = await speechService.transcribeAudio({
+      audioBuffer: req.file.buffer,
+      filename: req.file.originalname,
+      language: languageResult.language
+    });
+    
+    const result = {
+      text: transcriptionResult.text,
+      detectedLanguage: languageResult.language,
+      languageConfidence: languageResult.confidence,
+      transcriptionConfidence: transcriptionResult.confidence
+    };
+    
+    logger.info('Complete speech-to-text completed', {
+      filename: req.file.originalname,
+      detectedLanguage: languageResult.language,
+      textLength: result.text.length,
+      textSample: result.text.substring(0, 100) + '...',
+      languageConfidence: languageResult.confidence,
+      transcriptionConfidence: transcriptionResult.confidence
+    });
+    
+    res.json(result);
+  } catch (error) {
+    logger.error('Speech-to-text failed', { error });
+    if (error instanceof Error && error.message.includes('Invalid file type')) {
+      res.status(400).json({ error: error.message });
+    } else {
+      res.status(500).json({ error: 'Speech-to-text processing failed' });
+    }
+  }
+}));
+
 
 // Socket.IO authentication middleware
 io.use(authMiddleware);
@@ -393,6 +575,21 @@ httpServer.listen(config.port, async () => {
     }
   } catch (error) {
     logger.error('Email service initialization error', {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+  
+  // Check speech service configuration
+  try {
+    const speechService = SpeechService.getInstance();
+    const isAvailable = await speechService.isAvailable();
+    if (isAvailable) {
+      logger.info('Speech-to-text service initialized successfully with Groq API');
+    } else {
+      logger.warn('Speech-to-text service disabled - GROQ_API_KEY not configured');
+    }
+  } catch (error) {
+    logger.error('Speech service initialization error', {
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }

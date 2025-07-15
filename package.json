@@ -1,7 +1,8 @@
 {
-  "name": "terminal-to-web",
+  "name": "terminalflow",
   "version": "1.0.0",
   "main": "index.js",
+  "description": "A modern web-based terminal emulator with secure authentication",
   "scripts": {
     "dev": "nodemon src/server.ts",
     "build": "tsc",
@@ -14,15 +15,17 @@
     "typecheck": "tsc --noEmit",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["terminal", "web", "remote", "ssh", "console", "shell"],
   "author": "",
   "license": "ISC",
-  "description": "",
   "dependencies": {
+    "@types/multer": "^2.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
+    "groq-sdk": "^0.27.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.0.1",
     "node-pty": "^1.0.0",
     "nodemailer": "^7.0.5",
     "resend": "^4.6.0",
