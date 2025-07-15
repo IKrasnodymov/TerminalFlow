@@ -267,7 +267,7 @@ export function setupTerminalHandlers(io: Server<ClientToServerEvents, ServerToC
         logger.debug('Getting file list', { basePath });
         const files = await getFileList(basePath);
         logger.debug('File list result', { basePath, fileCount: files.length });
-        socket.emit('files:list' as any, files);
+        socket.emit('files:list' as any, { files, basePath });
       } catch (error) {
         logger.error('Failed to list files', {
           socketId: socket.id,

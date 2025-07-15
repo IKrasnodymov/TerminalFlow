@@ -7,6 +7,7 @@ class SimpleIDE {
         this.socket = null;
         this.fileTree = {};
         this.currentPath = '/';
+        this.basePath = null; // Store the base path from server
         this.directoryCheckBuffer = '';
         this.lastDirectoryCheck = 0;
         
@@ -344,8 +345,14 @@ class SimpleIDE {
             }
         });
         
-        this.socket.on('files:list', (files) => {
-            this.renderFileTree(files);
+        this.socket.on('files:list', (data) => {
+            // Handle both old format (array) and new format (object with files and basePath)
+            if (Array.isArray(data)) {
+                this.renderFileTree(data);
+            } else {
+                this.basePath = data.basePath;
+                this.renderFileTree(data.files);
+            }
         });
         
         this.socket.on('file:content', (data) => {
@@ -368,6 +375,9 @@ class SimpleIDE {
             sidebar.classList.remove('open');
             overlay.classList.remove('open');
         });
+        
+        // Setup context menu
+        this.setupContextMenu();
         
         // Exit Terminal Session
         const exitTerminalBtn = document.getElementById('exit-terminal-btn');
@@ -433,6 +443,9 @@ class SimpleIDE {
         
         // Setup mobile controls
         this.setupMobileControls();
+        
+        // Setup speech controls
+        this.checkSpeechAvailability();
         
         // Add terminal button
         const addTerminalBtn = document.getElementById('add-terminal-btn');
@@ -594,6 +607,298 @@ class SimpleIDE {
         });
     }
     
+    async checkSpeechAvailability() {
+        try {
+            const response = await fetch('/api/speech/status');
+            
+            if (!response.ok) {
+                this.hideSpeechButton();
+                return;
+            }
+            
+            const status = await response.json();
+            
+            if (status.available && status.hasApiKey) {
+                this.showSpeechButton();
+                this.setupSpeechControls();
+            } else {
+                this.hideSpeechButton();
+                if (!status.hasApiKey) {
+                    console.info('Speech-to-text disabled: GROQ_API_KEY not configured');
+                }
+            }
+        } catch (error) {
+            console.warn('Failed to check speech availability:', error);
+            this.hideSpeechButton();
+        }
+    }
+    
+    showSpeechButton() {
+        const speechContainer = document.getElementById('speech-button-container');
+        if (speechContainer) {
+            speechContainer.classList.add('available');
+        }
+    }
+    
+    hideSpeechButton() {
+        const speechContainer = document.getElementById('speech-button-container');
+        if (speechContainer) {
+            speechContainer.classList.remove('available');
+        }
+    }
+    
+    setupSpeechControls() {
+        // Initialize speech functionality
+        this.mediaRecorder = null;
+        this.audioChunks = [];
+        this.isRecording = false;
+        this.speechBtn = document.getElementById('speech-btn');
+        this.speechStatus = document.getElementById('speech-status');
+        this.speechProcessing = document.getElementById('speech-processing');
+        this.processingText = document.getElementById('processing-text');
+        this.processingCancel = document.getElementById('processing-cancel');
+        
+        if (!this.speechBtn) {
+            console.warn('Speech button not found');
+            return;
+        }
+        
+        // Check for microphone support
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            this.speechBtn.style.display = 'none';
+            console.warn('MediaDevices API not supported');
+            return;
+        }
+        
+        // Setup speech button event listeners - click to start/stop recording
+        this.speechBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (this.isRecording) {
+                this.stopRecording();
+            } else {
+                this.startRecording();
+            }
+        });
+        
+        // Processing cancel button
+        if (this.processingCancel) {
+            this.processingCancel.addEventListener('click', () => {
+                this.cancelSpeechProcessing();
+            });
+        }
+        
+        // Keyboard shortcut (optional: Ctrl+Space)
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.code === 'Space') {
+                e.preventDefault();
+                if (this.isRecording) {
+                    this.stopRecording();
+                } else {
+                    this.startRecording();
+                }
+            }
+        });
+    }
+    
+    async startRecording() {
+        if (this.isRecording) return;
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    echoCancellation: true,
+                    noiseSuppression: true
+                } 
+            });
+            
+            this.audioChunks = [];
+            this.mediaRecorder = new MediaRecorder(stream, {
+                mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/wav'
+            });
+            
+            this.mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    this.audioChunks.push(event.data);
+                }
+            };
+            
+            this.mediaRecorder.onstop = () => {
+                stream.getTracks().forEach(track => track.stop());
+                this.processAudio();
+            };
+            
+            this.mediaRecorder.start();
+            this.isRecording = true;
+            
+            // Update UI
+            this.speechBtn.classList.add('recording');
+            this.speechStatus.textContent = 'Recording... (click to stop)';
+            
+        } catch (error) {
+            console.error('Error starting recording:', error);
+            this.updateSpeechStatus('Microphone access denied', true);
+        }
+    }
+    
+    stopRecording() {
+        if (!this.isRecording || !this.mediaRecorder) return;
+        
+        this.isRecording = false;
+        this.mediaRecorder.stop();
+        
+        // Update UI
+        this.speechBtn.classList.remove('recording');
+        this.speechBtn.classList.add('processing');
+        this.speechStatus.textContent = 'Processing...';
+    }
+    
+    async processAudio() {
+        if (this.audioChunks.length === 0) {
+            this.resetSpeechButton();
+            return;
+        }
+        
+        try {
+            // Show processing overlay
+            this.showProcessingOverlay('Processing...');
+            
+            // Create audio blob
+            const audioBlob = new Blob(this.audioChunks, { 
+                type: this.mediaRecorder.mimeType 
+            });
+            
+            // Check if audio is too short
+            if (audioBlob.size < 1000) { // Less than ~1KB probably too short
+                this.hideProcessingOverlay();
+                this.updateSpeechStatus('Recording too short', true);
+                this.resetSpeechButton();
+                return;
+            }
+            
+            // Create form data
+            const formData = new FormData();
+            const filename = `recording.${this.mediaRecorder.mimeType.includes('webm') ? 'webm' : 'wav'}`;
+            formData.append('audio', audioBlob, filename);
+            
+            // Get token for API call
+            const token = localStorage.getItem('token');
+            if (!token) {
+                throw new Error('No authentication token');
+            }
+            
+            // Call speech-to-text API
+            this.updateProcessingText('Transcribing...');
+            
+            const response = await fetch('/api/speech/speech-to-text', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Speech processing failed');
+            }
+            
+            const result = await response.json();
+            
+            // Insert transcribed text into terminal
+            this.insertTextIntoTerminal(result.text);
+            
+            // Show success feedback
+            this.updateSpeechStatus(`Text inserted (${result.detectedLanguage})`, false);
+            
+        } catch (error) {
+            console.error('Error processing audio:', error);
+            this.updateSpeechStatus('Processing failed', true);
+        } finally {
+            this.hideProcessingOverlay();
+            this.resetSpeechButton();
+        }
+    }
+    
+    insertTextIntoTerminal(text) {
+        if (!text || !this.socket || !this.socket.connected || !this.activeTerminalId) {
+            console.error('Cannot insert text - no active terminal or connection');
+            return;
+        }
+        
+        // Clean up the text (remove extra whitespace, newlines)
+        const cleanedText = text.trim();
+        
+        if (cleanedText) {
+            // Send the text to the terminal
+            this.socket.emit('terminal:data', {
+                terminalId: this.activeTerminalId,
+                data: cleanedText
+            });
+        }
+    }
+    
+    showProcessingOverlay(text) {
+        if (this.speechProcessing) {
+            this.updateProcessingText(text);
+            this.speechProcessing.style.display = 'flex';
+            // Trigger animation
+            setTimeout(() => {
+                this.speechProcessing.classList.add('show');
+            }, 10);
+        }
+    }
+    
+    hideProcessingOverlay() {
+        if (this.speechProcessing) {
+            this.speechProcessing.classList.remove('show');
+            // Hide after animation
+            setTimeout(() => {
+                this.speechProcessing.style.display = 'none';
+            }, 300);
+        }
+    }
+    
+    updateProcessingText(text) {
+        if (this.processingText) {
+            this.processingText.textContent = text;
+        }
+    }
+    
+    cancelSpeechProcessing() {
+        // Stop recording if active
+        if (this.isRecording && this.mediaRecorder) {
+            this.mediaRecorder.stop();
+            this.isRecording = false;
+        }
+        
+        // Reset UI
+        this.hideProcessingOverlay();
+        this.resetSpeechButton();
+        this.updateSpeechStatus('Cancelled', false);
+    }
+    
+    resetSpeechButton() {
+        if (this.speechBtn) {
+            this.speechBtn.classList.remove('recording', 'processing');
+        }
+        
+        // Reset status after a delay
+        setTimeout(() => {
+            if (this.speechStatus) {
+                this.speechStatus.textContent = 'Click to record';
+            }
+        }, 2000);
+    }
+    
+    updateSpeechStatus(message, isError = false) {
+        if (this.speechStatus) {
+            this.speechStatus.textContent = message;
+            this.speechStatus.style.color = isError ? 'var(--status-error)' : 'var(--text-primary)';
+        }
+    }
+    
     updateStatus(message, connected) {
         const status = document.getElementById('connection-status');
         status.textContent = `● ${message}`;
@@ -642,21 +947,31 @@ class SimpleIDE {
         files.forEach(file => {
             const parts = file.path.split('/').filter(p => p);
             let current = tree;
+            let currentPath = '';
             
             parts.forEach((part, index) => {
+                currentPath += (currentPath ? '/' : '') + part;
+                
                 if (index === parts.length - 1) {
-                    // File
+                    // File - construct absolute path
+                    const absolutePath = this.basePath ? 
+                        (this.basePath + '/' + file.path).replace(/\/+/g, '/') : 
+                        file.path;
                     current[part] = {
                         type: 'file',
                         name: part,
-                        path: file.path
+                        path: absolutePath
                     };
                 } else {
-                    // Directory
+                    // Directory - construct absolute path
                     if (!current[part]) {
+                        const absoluteFolderPath = this.basePath ? 
+                            (this.basePath + '/' + currentPath).replace(/\/+/g, '/') : 
+                            currentPath;
                         current[part] = {
                             type: 'folder',
                             name: part,
+                            path: absoluteFolderPath,
                             children: {}
                         };
                     }
@@ -682,8 +997,8 @@ class SimpleIDE {
             
             if (node.type === 'folder') {
                 html += `
-                    <div class="tree-folder" data-path="${key}">
-                        <div class="tree-item" style="padding-left: ${16 + level * 16}px">
+                    <div class="tree-folder" data-path="${node.path}">
+                        <div class="tree-item" data-path="${node.path}" style="padding-left: ${16 + level * 16}px">
                             <svg class="tree-item-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
                             </svg>
@@ -740,25 +1055,168 @@ class SimpleIDE {
             });
         });
         
-        // File click
+        // File and folder interactions
         document.querySelectorAll('.tree-item[data-path]').forEach(item => {
-            item.addEventListener('click', (e) => {
+            // Check if this is a file (no svg icons) or folder (has svg icons)
+            const isFile = !item.querySelector('svg.tree-item-icon');
+            
+            if (isFile) {
+                // File click - open for viewing
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Remove previous selection
+                    document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
+                    item.classList.add('selected');
+                    
+                    // Open file for viewing
+                    const path = item.dataset.path;
+                    if (this.socket && this.socket.connected) {
+                        this.socket.emit('file:read', {
+                            path: path,
+                            terminalId: this.activeTerminalId
+                        });
+                    }
+                });
+            }
+            
+            // Right-click context menu for both files and folders
+            item.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                
-                // Remove previous selection
-                document.querySelectorAll('.tree-item').forEach(i => i.classList.remove('selected'));
-                item.classList.add('selected');
-                
-                // Open file for viewing
-                const path = item.dataset.path;
-                if (this.socket && this.socket.connected) {
-                    this.socket.emit('file:read', {
-                        path: path,
-                        terminalId: this.activeTerminalId
-                    });
-                }
+                this.showContextMenu(e, item.dataset.path);
             });
         });
+    }
+    
+    setupContextMenu() {
+        this.contextMenu = document.getElementById('context-menu');
+        this.currentContextPath = null;
+        
+        // Close context menu when clicking elsewhere
+        document.addEventListener('click', () => {
+            this.hideContextMenu();
+        });
+        
+        // Context menu item handlers
+        document.getElementById('copy-path').addEventListener('click', () => {
+            this.copyToClipboard(this.currentContextPath);
+            this.hideContextMenu();
+        });
+        
+        document.getElementById('copy-relative-path').addEventListener('click', () => {
+            const relativePath = this.currentContextPath.startsWith('./') ? 
+                this.currentContextPath : './' + this.currentContextPath;
+            this.copyToClipboard(relativePath);
+            this.hideContextMenu();
+        });
+        
+        document.getElementById('insert-path').addEventListener('click', () => {
+            this.insertPathIntoTerminal(this.currentContextPath);
+            this.hideContextMenu();
+        });
+    }
+    
+    showContextMenu(event, path) {
+        this.currentContextPath = path;
+        this.contextMenu.style.left = event.pageX + 'px';
+        this.contextMenu.style.top = event.pageY + 'px';
+        this.contextMenu.style.display = 'block';
+        
+        // Add animation class
+        setTimeout(() => {
+            this.contextMenu.classList.add('show');
+        }, 10);
+        
+        // Ensure menu stays within viewport
+        const rect = this.contextMenu.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        if (rect.right > viewportWidth) {
+            this.contextMenu.style.left = (event.pageX - rect.width) + 'px';
+        }
+        
+        if (rect.bottom > viewportHeight) {
+            this.contextMenu.style.top = (event.pageY - rect.height) + 'px';
+        }
+    }
+    
+    hideContextMenu() {
+        if (this.contextMenu) {
+            this.contextMenu.classList.remove('show');
+            setTimeout(() => {
+                this.contextMenu.style.display = 'none';
+            }, 150);
+        }
+    }
+    
+    async copyToClipboard(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            // Just copy silently, no notification
+        } catch (error) {
+            console.error('Failed to copy to clipboard:', error);
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            // Just copy silently, no notification
+        }
+    }
+    
+    insertPathIntoTerminal(path) {
+        if (this.socket && this.socket.connected && this.activeTerminalId) {
+            // Clean the path and add quotes if it contains spaces
+            const cleanPath = path.replace(/[\x00-\x1f\x7f-\x9f]/g, ''); // Remove control characters
+            const quotedPath = cleanPath.includes(' ') ? `"${cleanPath}"` : cleanPath;
+            this.socket.emit('terminal:data', {
+                terminalId: this.activeTerminalId,
+                data: quotedPath
+            });
+            // Just insert silently, no notification
+        }
+    }
+    
+    showNotification(message) {
+        // Create a temporary notification
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            padding: 12px 20px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 4000;
+            font-size: 14px;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.style.opacity = '1';
+            notification.style.transform = 'translateY(0)';
+        }, 10);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transform = 'translateY(20px)';
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        }, 3000);
     }
     
     showFileContent(path, content) {
