@@ -2,7 +2,7 @@
   "name": "terminalflow",
   "version": "1.0.0",
   "main": "index.js",
-  "description": "A modern web-based terminal emulator with secure authentication",
+  "description": "🖥️ Modern web-based terminal emulator with email 2FA, mobile optimization, and speech-to-text. Access your macOS terminal from anywhere via browser.",
   "scripts": {
     "dev": "nodemon src/server.ts",
     "build": "tsc",

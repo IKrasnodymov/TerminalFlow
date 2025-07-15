@@ -1,336 +1,314 @@
 # TerminalFlow 🖥️
 
-A modern web-based terminal emulator that enables remote control of your macOS terminal from any device through a web browser. Features secure email-based two-factor authentication and mobile optimization.
+A modern web-based terminal emulator that enables secure remote control of your macOS terminal from any device through a web browser. Features email-based two-factor authentication, mobile optimization, and speech-to-text integration.
 
-![Terminal Demo](https://img.shields.io/badge/Platform-macOS-blue) ![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)
+![Platform](https://img.shields.io/badge/Platform-macOS-blue) ![Node.js](https://img.shields.io/badge/Node.js-18+-green) ![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue) ![License](https://img.shields.io/badge/License-ISC-lightgrey)
 
-## ✨ Возможности
+## 📸 Screenshots
 
-- 🖥️ **Полноценный терминал в браузере** - доступ к zsh/bash с любого устройства
-- 📱 **Мобильная оптимизация** - виртуальная клавиатура и сенсорные элементы управления
-- 🔐 **Безопасная аутентификация** - одноразовые коды доступа на email
-- ⚡ **Реальное время** - WebSocket для мгновенной реакции терминала
-- 🌍 **Удаленный доступ** - Cloudflare Tunnel для доступа из любой точки мира
-- 📋 **Быстрые команды** - сохраняемые шаблоны команд для ускорения работы
-- 🔄 **Автомасштабирование** - адаптация под размер экрана и ориентацию
-- 🛡️ **Защита от атак** - rate limiting и JWT токены
+### IDE Interface with File Explorer
+![TerminalFlow IDE Interface](1.png)
+*Full IDE experience with file explorer, terminal interface, and virtual mobile controls*
 
-## 🚀 Быстрый старт
+### Claude Code Integration
+![Claude Code Integration](2.png)
+*Integrated AI assistance with speech-to-text capabilities powered by Groq API*
 
-### 1. Установка
+## ✨ Features
+
+- 🖥️ **Full Terminal in Browser** - Access zsh/bash from any device
+- 📱 **Mobile Optimized** - Virtual keyboard and touch-friendly controls
+- 🔐 **Secure Authentication** - Email-based one-time access codes
+- ⚡ **Real-time Communication** - WebSocket for instant terminal response
+- 🌍 **Remote Access** - Cloudflare Tunnel for worldwide accessibility
+- 🗣️ **Speech-to-Text** - Voice commands powered by Groq API
+- 📋 **Quick Commands** - Persistent command templates for efficiency
+- 🔄 **Auto-scaling** - Adapts to screen size and orientation
+- 🛡️ **Security Features** - Rate limiting, JWT tokens, and XSS protection
+- 📁 **File Explorer** - Browse and manage files with real-time directory sync
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+
+- Node.js 18+ 
+- macOS (for PTY terminal support)
+- npm or yarn package manager
+
+### 2. Installation
 
 ```bash
-# Клонируйте репозиторий
-git clone <repository-url>
+# Clone the repository
+git clone https://github.com/your-username/terminal-to-web.git
 cd terminal-to-web
 
-# Установите зависимости
+# Install dependencies
 npm install
 ```
 
-### 2. Настройка email сервиса (Resend)
-
-1. **Зарегистрируйтесь в Resend**:
-   - Перейдите на https://resend.com/
-   - Создайте бесплатный аккаунт (3000 emails/месяц)
-   - Получите API ключ в разделе API Keys
-
-2. **Настройте .env файл**:
-   ```bash
-   # Скопируйте пример конфигурации
-   cp .env.example .env
-   
-   # Отредактируйте .env файл
-   nano .env
-   ```
-
-### 3. Конфигурация (.env)
+### 3. Environment Configuration
 
 ```bash
-# Основные настройки
-PORT=3000
-NODE_ENV=development
+# Copy the example environment file
+cp .env.example .env
 
-# Безопасность (ОБЯЗАТЕЛЬНО ИЗМЕНИТЕ!)
-JWT_SECRET=ваш-секретный-ключ-минимум-32-символа
+# Edit the configuration
+nano .env
+```
+
+#### Required Environment Variables
+
+```bash
+# Security (MUST CHANGE FOR PRODUCTION!)
+JWT_SECRET=your-secret-key-minimum-32-characters
 ACCESS_PASSWORD=legacy-password-for-compatibility
 
-# Email сервис (Resend)
-RESEND_API_KEY=re_ваш_api_ключ_от_resend
-NOTIFICATION_EMAIL=ваш-email@domain.com
+# Email Service (Resend API - 3000 emails/month free)
+RESEND_API_KEY=re_your_resend_api_key
+NOTIFICATION_EMAIL=your-email@domain.com
 
-# Настройки аутентификации
+# Optional: Speech-to-Text (Groq API)
+GROQ_API_KEY=gsk_your_groq_api_key
+
+# Server Configuration
+PORT=3000
+NODE_ENV=development
 MAX_LOGIN_ATTEMPTS=5
 LOCKOUT_TIME_MINUTES=15
 ACCESS_CODE_EXPIRY_MINUTES=10
 ```
 
-### 4. Запуск
+### 4. Run the Application
 
 ```bash
-# Разработка (только локально)
+# Development (local only)
 npm run dev
 
-# Разработка + удаленный доступ
+# Development with remote access
 npm run start:dev
 
-# Продакшн
+# Production
 npm run build
 npm start
 ```
 
-## 🌍 Удаленный доступ
+## 🔑 API Setup Instructions
 
-### Cloudflare Tunnel (рекомендуется)
+### Resend Email Service (Required)
 
-1. **Установите cloudflared**:
+1. **Create Account**: Visit [resend.com](https://resend.com/)
+2. **Get API Key**: 
+   - Sign up for free account (3000 emails/month)
+   - Navigate to API Keys section
+   - Create new API key
+   - Copy the key starting with `re_`
+
+3. **Configure**:
+   ```bash
+   RESEND_API_KEY=re_your_api_key_here
+   NOTIFICATION_EMAIL=your-email@domain.com
+   ```
+
+### Groq Speech-to-Text (Optional)
+
+1. **Create Account**: Visit [console.groq.com](https://console.groq.com/)
+2. **Get API Key**:
+   - Sign up for free account
+   - Navigate to API Keys
+   - Create new API key
+   - Copy the key starting with `gsk_`
+
+3. **Configure**:
+   ```bash
+   GROQ_API_KEY=gsk_your_groq_api_key_here
+   ```
+
+### Cloudflare Tunnel (For Remote Access)
+
+1. **Install cloudflared**:
    ```bash
    # macOS
    brew install cloudflared
    
-   # или скачайте с https://github.com/cloudflare/cloudflared/releases
+   # Or download from: https://github.com/cloudflare/cloudflared/releases
    ```
 
-2. **Запустите с туннелем**:
+2. **Quick Setup** (Development):
    ```bash
    npm run start:dev
    ```
+   This will show a public URL like: `https://random-name.trycloudflare.com`
 
-3. **Получите публичный URL** - будет показан в логах:
-   ```
-   https://random-name.trycloudflare.com
-   ```
-
-### Постоянный домен (для продакшна)
-
-1. **Настройте именованный туннель**:
+3. **Named Tunnel** (Production):
    ```bash
    cloudflared tunnel login
    cloudflared tunnel create terminal-web
-   cloudflared tunnel route dns terminal-web terminal.ваш-домен.com
+   cloudflared tunnel route dns terminal-web terminal.yourdomain.com
    ```
 
-2. **Создайте config.yml**:
-   ```yaml
-   tunnel: <tunnel-id>
-   credentials-file: ~/.cloudflared/<tunnel-id>.json
-   
-   ingress:
-     - hostname: terminal.ваш-домен.com
-       service: http://localhost:3000
-     - service: http_status:404
-   ```
+## 🏗️ Architecture
 
-## 📱 Использование
+### Backend Stack
+- **Node.js + TypeScript** - Server runtime and type safety
+- **Express.js** - Web server framework
+- **Socket.IO** - Real-time WebSocket communication
+- **node-pty** - PTY process management for terminal emulation
+- **JWT** - Secure authentication tokens
+- **Resend/Nodemailer** - Email service for 2FA codes
 
-### 1. Аутентификация
+### Frontend Stack
+- **Vanilla JavaScript** - Lightweight client-side code
+- **xterm.js** - Terminal emulation in browser
+- **Socket.IO Client** - Real-time communication
+- **Responsive CSS** - Mobile-optimized interface
 
-1. Откройте веб-адрес (локальный или публичный)
-2. Нажмите "📧 Запросить код доступа"
-3. Проверьте email - придет письмо с 6-значным кодом
-4. Введите код в форму и нажмите "🔐 Войти"
-
-### 2. Работа с терминалом
-
-- **Обычная клавиатура** - работает как в настоящем терминале
-- **Мобильные устройства**:
-  - `Ctrl/Alt/Tab/Esc` - виртуальные кнопки
-  - `↑↓←→` - кнопка стрелок
-  - `CMD` - быстрые команды
-  - `[ ]` - полноэкранный режим
-
-### 3. Быстрые команды
-
-1. Нажмите кнопку `CMD`
-2. Добавьте команду кнопкой `+`
-3. Введите команду и название
-4. Используйте для быстрого выполнения
-
-## 🏗️ Архитектура
-
-### Backend (Node.js + TypeScript)
+### Project Structure
 
 ```
 src/
-├── server.ts              # Основной сервер Express + Socket.IO
-├── config.ts              # Конфигурация с валидацией
-├── terminalHandler.ts     # Обработка terminal events
-├── services/              # Сервисный слой
-│   ├── TerminalManager.ts # Управление PTY процессами
-│   ├── AccessCodeService.ts # Генерация/валидация кодов
-│   ├── ResendEmailService.ts # Email через Resend API
-│   └── EmailService.ts    # Fallback для Gmail
-├── middleware/            # Middleware для Express/Socket.IO
-│   ├── auth.ts           # JWT аутентификация
-│   └── errorHandler.ts   # Обработка ошибок
-└── utils/                # Утилиты
-    ├── security.ts       # Rate limiting
-    ├── validation.ts     # Валидация данных
-    ├── logger.ts         # Структурированное логирование
-    └── environment.ts    # Безопасная среда для PTY
-```
+├── server.ts              # Main Express server + Socket.IO
+├── config.ts              # Configuration with validation
+├── terminalHandler.ts     # Terminal event handling
+├── services/              # Business logic layer
+│   ├── TerminalManager.ts # PTY process management
+│   ├── AccessCodeService.ts # 2FA code generation/validation
+│   ├── CommandService.ts  # Persistent command storage
+│   ├── ResendEmailService.ts # Email service (primary)
+│   ├── EmailService.ts    # Gmail SMTP fallback
+│   └── SpeechService.ts   # Speech-to-text integration
+├── middleware/            # Express/Socket.IO middleware
+│   ├── auth.ts           # JWT authentication
+│   └── errorHandler.ts   # Error handling
+└── utils/                # Utility functions
+    ├── security.ts       # Rate limiting & security
+    ├── validation.ts     # Input validation & XSS protection
+    └── logger.ts         # Structured logging
 
-### Frontend (Vanilla JS)
-
-```
 public/
-├── index.html     # Интерфейс с формами аутентификации
-├── app.js         # Основная логика + мобильные элементы управления
-└── style.css      # Адаптивные стили для всех устройств
+├── index.html           # Authentication interface
+├── terminal.html        # IDE interface with file explorer
+├── app.js              # Authentication logic
+├── ide-app.js          # IDE and terminal functionality
+└── style.css           # Responsive styles
 ```
 
-### Поток аутентификации
+## 🔐 Security Features
 
-1. `POST /auth/request-code` → генерация кода → отправка email
-2. `POST /auth/token` → валидация кода → выдача JWT
-3. WebSocket подключение с JWT → создание PTY → работа с терминалом
+### Built-in Protection
+- **Rate Limiting**: 5 authentication attempts per IP per 15 minutes
+- **JWT Tokens**: 24-hour expiration with secure signing
+- **Access Codes**: 6-digit codes with 10-minute expiry
+- **Input Validation**: XSS protection and data sanitization
+- **Environment Filtering**: Secure PTY process environment
+- **IP Tracking**: Progressive lockout with exponential backoff
 
-## 🔧 Команды разработки
+### Production Security Recommendations
 
-```bash
-# Разработка
-npm run dev              # Сервер с hot reload
-npm run start:dev        # Сервер + Cloudflare tunnel
-npm run start:all        # Build + сервер + tunnel
-
-# Продакшн
-npm run build            # Компиляция TypeScript
-npm start               # Запуск готового build
-
-# Качество кода
-npm run lint            # Проверка ESLint
-npm run lint:fix        # Автоисправление
-npm run format          # Форматирование Prettier
-npm run typecheck       # Проверка типов TypeScript
-```
-
-## 🛡️ Безопасность
-
-### Встроенная защита
-
-- **Rate Limiting**: 5 попыток на IP за 15 минут
-- **JWT токены**: срок действия 24 часа
-- **Коды доступа**: 6 цифр, 10 минут действия
-- **Валидация входных данных**: защита от XSS
-- **Фильтрация переменных среды**: безопасность PTY процессов
-
-### Рекомендации для продакшна
-
-1. **Измените секретные ключи**:
+1. **Change Default Secrets**:
    ```bash
-   # Генерация случайного JWT secret
+   # Generate random JWT secret
    openssl rand -base64 32
    ```
 
-2. **Настройте CORS для продакшна**:
+2. **Configure CORS**:
    ```bash
-   CORS_ORIGIN=https://ваш-домен.com,https://другой-домен.com
+   CORS_ORIGIN=https://yourdomain.com,https://anotherdomain.com
    ```
 
-3. **Используйте HTTPS**: Cloudflare Tunnel автоматически обеспечивает HTTPS
+3. **Use HTTPS**: Cloudflare Tunnel provides automatic HTTPS
+4. **Monitor Logs**: All events are logged in structured format
 
-4. **Мониторинг логов**: все события записываются структурированно
+## 📱 Mobile Optimization
 
-## 📧 Настройка Email
-
-### Resend (рекомендуется)
-
-1. **Регистрация**: https://resend.com/
-2. **Лимиты**: 3000 emails/месяц бесплатно
-3. **Настройка**:
-   ```bash
-   RESEND_API_KEY=re_xxxxxxxxxx
-   NOTIFICATION_EMAIL=ваш-email@domain.com
-   ```
-
-### Тестирование без email
-
-В режиме разработки коды отображаются в консоли сервера:
-
-```bash
-============================================================
-🖥️  TERMINAL ACCESS CODE
-============================================================
-📧 Email: your-email@domain.com
-🔐 CODE: 123456
-⏰ Valid for: 10 minutes
-============================================================
-```
-
-## 🔧 Устранение неполадок
-
-### Ошибки компиляции node-pty
-
-```bash
-# macOS
-xcode-select --install
-
-# Переустановка зависимостей
-rm -rf node_modules package-lock.json
-npm install
-```
-
-### Проблемы с аутентификацией
-
-1. **Код не приходит**: проверьте RESEND_API_KEY в .env
-2. **Неверный код**: коды действуют 10 минут
-3. **Rate limiting**: подождите 15 минут или перезапустите сервер
-
-### Cloudflare Tunnel
-
-```bash
-# Проверка статуса
-cloudflared tunnel list
-
-# Перезапуск туннеля
-pkill cloudflared
-npm run start:dev
-```
-
-### Веб-интерфейс
-
-1. **Терминал не появляется**: проверьте консоль браузера на ошибки
-2. **WebSocket ошибки**: убедитесь что сервер запущен
-3. **Мобильные проблемы**: очистите localStorage браузера
-
-## 📱 Мобильная оптимизация
-
-### Поддерживаемые устройства
-
+### Supported Devices
 - ✅ iPhone/iPad (Safari, Chrome)
-- ✅ Android (Chrome, Firefox)
-- ✅ Настольные браузеры (все современные)
+- ✅ Android (Chrome, Firefox) 
+- ✅ Desktop browsers (all modern browsers)
 
-### Особенности мобильного интерфейса
+### Mobile Features
+- **Virtual Controls**: Ctrl/Alt/Tab/Esc buttons for mobile users
+- **Arrow Keys**: Dedicated navigation panel
+- **Quick Commands**: Persistent localStorage-based shortcuts
+- **Responsive Design**: Font sizing adapts to device orientation
+- **Touch Support**: Integrated virtual keyboard
+- **Speech Input**: Voice-to-text command entry
 
-- **Адаптивный шрифт**: автоматическое изменение размера
-- **Виртуальная клавиатура**: интеграция с системной клавиатурой
-- **Touch-события**: оптимизированы для сенсорных экранов
-- **Ориентация**: поддержка поворота экрана
+## 🚀 Usage
 
-## 🚀 Развертывание
+### Authentication Flow
 
-### VPS развертывание
+1. Open the web application (local or public URL)
+2. Click "📧 Request Access Code"
+3. Enter your email address
+4. Check email for 6-digit access code
+5. Enter code and click "🔐 Login"
+6. Access granted for 24 hours
 
-1. **Подготовка сервера**:
+### Terminal Usage
+
+- **Desktop**: Works like a native terminal
+- **Mobile Controls**:
+  - `Ctrl/Alt/Tab/Esc`: Virtual modifier keys
+  - `↑↓←→`: Arrow key navigation
+  - `CMD`: Quick commands panel
+  - `[ ]`: Fullscreen toggle
+  - `🎤`: Speech-to-text input
+
+### Speech-to-Text
+
+1. Click the microphone button (🎤) in the terminal
+2. Speak your command
+3. Command is automatically transcribed and entered
+4. Supports multiple languages with auto-detection
+
+### Quick Commands
+
+1. Click the `CMD` button
+2. Add new command with `+` button
+3. Enter command and description
+4. Use for rapid command execution
+
+## 🛠️ Development Commands
+
+```bash
+# Development
+npm run dev              # Server with hot reload
+npm run start:dev        # Server + Cloudflare tunnel
+npm run start:all        # Build + server + tunnel
+
+# Production
+npm run build            # Compile TypeScript
+npm start               # Run production build
+
+# Code Quality
+npm run lint            # ESLint check
+npm run lint:fix        # Auto-fix linting issues
+npm run format          # Prettier formatting
+npm run typecheck       # TypeScript type checking
+```
+
+## 🚀 Deployment
+
+### VPS Deployment
+
+1. **Server Preparation** (Ubuntu/Debian):
    ```bash
-   # Ubuntu/Debian
    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
    sudo apt-get install -y nodejs
    ```
 
-2. **Клонирование и настройка**:
+2. **Application Setup**:
    ```bash
-   git clone <repository>
+   git clone https://github.com/your-username/terminal-to-web.git
    cd terminal-to-web
    npm install
    npm run build
    ```
 
-3. **Systemd сервис**:
+3. **Systemd Service**:
    ```ini
    [Unit]
-   Description=Terminal to Web
+   Description=TerminalFlow
    After=network.target
    
    [Service]
@@ -345,7 +323,7 @@ npm run start:dev
    WantedBy=multi-user.target
    ```
 
-### Docker развертывание
+### Docker Deployment
 
 ```dockerfile
 FROM node:18-alpine
@@ -358,12 +336,64 @@ EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
-## 📊 Мониторинг
+## 🔧 Troubleshooting
 
-### Логи
+### Common Issues
 
-Все события записываются в структурированном формате:
+#### 1. node-pty Compilation Errors
+```bash
+# macOS
+xcode-select --install
 
+# Reinstall dependencies
+rm -rf node_modules package-lock.json
+npm install
+```
+
+#### 2. Authentication Problems
+- **Code not received**: Check RESEND_API_KEY in .env
+- **Invalid code**: Codes expire after 10 minutes
+- **Rate limiting**: Wait 15 minutes or restart server
+
+#### 3. Cloudflare Tunnel Issues
+```bash
+# Check tunnel status
+cloudflared tunnel list
+
+# Restart tunnel
+pkill cloudflared
+npm run start:dev
+```
+
+#### 4. WebSocket Connection Failures
+- Ensure server is running on correct port
+- Check browser console for error messages
+- Verify JWT token validity
+- Clear browser localStorage if needed
+
+### Development Mode
+
+Without email configuration, access codes are displayed in server console:
+
+```bash
+============================================================
+🖥️  TERMINAL ACCESS CODE
+============================================================
+📧 Email: your-email@domain.com
+🔐 CODE: 123456
+⏰ Valid for: 10 minutes
+============================================================
+```
+
+## 📊 Monitoring & Health Check
+
+### Health Endpoint
+```bash
+curl http://localhost:3000/health
+```
+
+### Structured Logging
+All events are logged in JSON format:
 ```json
 {
   "level": "info",
@@ -374,31 +404,46 @@ CMD ["npm", "start"]
 }
 ```
 
-### Health Check
+## 🤝 Contributing
 
-```bash
-curl http://localhost:3000/health
-```
+### Setup Development Environment
 
-## 🤝 Поддержка
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Make your changes
+4. Run tests: `npm run lint && npm run typecheck`
+5. Commit changes: `git commit -m "feat: description"`
+6. Push to branch: `git push origin feature-name`
+7. Create Pull Request
 
-### Документация
+### Code Style
 
-- [CLAUDE.md](./CLAUDE.md) - техническая документация для разработчиков
-- [SECURITY_IMPROVEMENTS.md](./SECURITY_IMPROVEMENTS.md) - улучшения безопасности
-- [REMOTE_ACCESS.md](./REMOTE_ACCESS.md) - варианты удаленного доступа
+- Use TypeScript for all backend code
+- Follow ESLint and Prettier configurations
+- Write descriptive commit messages
+- Add tests for new features
+- Update documentation as needed
 
-### Сообщения об ошибках
+## 📄 License
 
-1. Опишите проблему подробно
-2. Приложите логи сервера
-3. Укажите версию Node.js и операционную систему
-4. Опишите шаги для воспроизведения
+ISC License - see [LICENSE](LICENSE) file for details.
 
-## 📄 Лицензия
+## 🆘 Support
 
-ISC License - см. файл LICENSE
+### Documentation
+- [CLAUDE.md](./CLAUDE.md) - Technical documentation for developers
+- [SECURITY_IMPROVEMENTS.md](./SECURITY_IMPROVEMENTS.md) - Security enhancements
+- [REMOTE_ACCESS.md](./REMOTE_ACCESS.md) - Remote access configuration
+
+### Bug Reports
+
+When reporting issues, please include:
+1. Detailed problem description
+2. Server logs (if applicable)
+3. Node.js version and operating system
+4. Steps to reproduce the issue
+5. Expected vs actual behavior
 
 ---
 
-**⚡ Быстрый старт**: `npm install && npm run start:dev` - и ваш терминал доступен из любой точки мира!
+**⚡ Quick Start**: `npm install && npm run start:dev` - Your terminal accessible from anywhere in the world!
